@@ -68,27 +68,40 @@ def ReanudarClick ():
 #configuracion de la ventana principal
 window = Tk()
 window.geometry("1200x800")
-window.rowconfigure(0, weight=1)
+window.configure(bg="azure")
+window.title("Ventana Principal")
+window.rowconfigure(0, weight=0)
 window.rowconfigure(1, weight=2)
 window.rowconfigure(2, weight=2)
 window.columnconfigure(0, weight=1)
-window.columnconfigure(1, weight=1)
-window.columnconfigure(2, weight=1)
+
 #configuracion titulo
-tituloLabel = Label(window, text = "Mi programa", font=("Courier", 20, "italic"))
+tituloLabel = Label(window, text = "Sistema satelital", font=("Georgia", 22, "italic"),bg="azure")
 tituloLabel.grid(row=0, column=0, columnspan=3, padx=5, pady=5, sticky=N + S + E + W)
 
 #configuracion botones interfaz
-InicioButton = Button(window, text="Inicio", bg='green', fg="white",command=IniciarClick)
-InicioButton.grid(row=2, column=0, padx=5, pady=5, sticky=N + S + E + W)
-PararButton = Button(window, text="Parar", bg='red', fg="white", command = PararClick)
-PararButton.grid(row=2, column=1, padx=5, pady=5, sticky=N + S + E + W)
-ReanudarButton = Button(window, text="Reanudar", bg='yellow', fg="black", command = ReanudarClick)
-ReanudarButton.grid(row=2, column=2, padx=5, pady=5, sticky=N + S + E + W)
-
+#Marco de la grafica
+frame_graph = LabelFrame(window,text="Gráfica de temperatura",bg="azure",font=("Georgia",10,'italic'))
+frame_graph.grid(row=1, column=0,padx=5,pady=5,sticky = N + S + E + W)
+frame_graph.rowconfigure(0,weight=1)
+frame_graph.columnconfigure(0,weight=1)
 #integra el grafico en la ventana
-canvas = FigureCanvasTkAgg(fig, master=window)
-canvas.get_tk_widget().grid(row=1, column=0, columnspan=3, padx=10, pady=10, sticky=N + S + E + W)
+canvas = FigureCanvasTkAgg(fig, master=frame_graph)
+canvas.get_tk_widget().grid(row=0, column=0, columnspan=3, padx=5, pady=5, sticky=N + S + E + W)
+#Marco de los botones
+frame_botones = LabelFrame(window, text='Controles', bg="azure", font=("Georgia", 10, "italic"))
+frame_botones.grid(row=2, column=0, padx=20, pady=10, sticky=N + S + E + W)
+frame_botones.rowconfigure(0,weight=1)
+frame_botones.columnconfigure(0,weight=1)
+frame_botones.columnconfigure(1,weight=1)
+frame_botones.columnconfigure(2,weight=1)
+#Botones
+InicioButton = Button(frame_botones, text="Inicio", bg='pale green', fg="black",command=IniciarClick,font=("Georgia", 10, "italic"))
+InicioButton.grid(row=0, column=0, padx=5, pady=5, sticky=N + S + E + W)
+PararButton = Button(frame_botones, text="Parar", bg='tomato', fg="black", command = PararClick,font=("Georgia", 10, "italic"))
+PararButton.grid(row=0, column=1, padx=5, pady=5, sticky=N + S + E + W)
+ReanudarButton = Button(frame_botones, text="Reanudar", bg='goldenrod1', fg="black", command = ReanudarClick,font=("Georgia", 10, "italic"))
+ReanudarButton.grid(row=0, column=2, padx=5, pady=5, sticky=N + S + E + W)
 
 window.after(100,ActualizarGrafico) #llama a la funcion que actualiza el grafico
 
