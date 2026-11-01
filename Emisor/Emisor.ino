@@ -1,8 +1,9 @@
 // Variables globales
 const int led1=12;
 bool enviar = false;
-const long interval1=1000;
+const long interval=2000;
 bool stateLed1=LOW;
+unsigned long prevmillis = 0;
 
 #include <SoftwareSerial.h>
 #include <DHT.h>
@@ -25,7 +26,6 @@ void setup() {
    dht.begin();
 }
 void loop() {
-   
         // Ya toca cambiar, alterna el estado del led
         if (stateLed1 == LOW)
              stateLed1 = HIGH;
@@ -43,7 +43,8 @@ void loop() {
    } else if (mensaje == 'p'){ // Desactiva el envío de datos si recibe 'p' (Parar)
       enviar = false;
    }
-   if(enviar){
+   if(enviar && (millis()-prevmillis >= interval)){
+      prevmillis = millis();
       float h = dht.readHumidity(); //Lee humedad
       float t = dht.readTemperature(); //Lee temperatura
       if (isnan(h) || isnan(t)) // Comprueba si ha ocurrido algún error al leer
@@ -54,5 +55,4 @@ void loop() {
          mySerial.println(h);
       }
    }
-   delay(1000);
 }
