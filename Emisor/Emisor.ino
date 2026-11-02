@@ -1,8 +1,10 @@
 // Variables globales
 const int led1=12;
+const int led2=13;
 bool enviar = false;
 const long interval=2000;
 bool stateLed1=LOW;
+bool stateLed2=LOW;
 unsigned long prevmillis = 0;
 
 #include <SoftwareSerial.h>
@@ -26,6 +28,7 @@ void setup() {
         dht.begin();
 }
 void loop() {
+         SenyalLatido();
         // Ya toca cambiar, alterna el estado del led
         if (stateLed1 == LOW)
                 stateLed1 = HIGH;
@@ -39,6 +42,16 @@ void loop() {
         if(enviar && (millis()-prevmillis >= interval)){
                 LeerTempHum();
         }
+        else if(millis()-prevmillis>5000){
+                Serial.print("Fallo de lectura");
+                if (stateLed2 == LOW){
+                  stateLed2 = HIGH;
+                }
+                else{
+                  stateLed2 = LOW;
+                }
+        } //Si pasan más de 5 segundos entre lecturas, 
+          //entonces hay un error de lectura y el arduino satélite lo avisa
 }
 void LeerMensaje(){
         char mensaje = mySerial.read();
@@ -60,4 +73,7 @@ void LeerTempHum(){
                 mySerial.print(":");
                 mySerial.println(h);
         }
+}
+void SenyalLatido(){
+   char senyal_vida = mySerial.print("Life");
 }

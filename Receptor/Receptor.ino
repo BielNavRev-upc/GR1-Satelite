@@ -8,6 +8,10 @@ void setup() {
    mySerial.begin(9600);
 }
 void loop() {
+   char senyal_vida = Serial.read();
+   if (senyal_vida != "Life"){
+      Serial.print("Error de comunicacion");
+   }
    char mensaje = Serial.read();
    if (mensaje == 'i' || mensaje == 'r'){ //Si recibe de la interfaz 'i' (Iniciar) o 'r' (Reanudar), envía una "i" al emisor
       mySerial.println("i");
