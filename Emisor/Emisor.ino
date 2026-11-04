@@ -28,6 +28,7 @@ void setup() {
         Serial.begin(9600);
         // Inicialización del sensor
         dht.begin();
+        lastValidTH = millis();
 }
 void loop() {
         unsigned long Now = millis();
@@ -47,7 +48,7 @@ void ReadCommand(){
         }
 }
 void THControl(unsigned long Now){
-        if(Now-lastValidTH >= 2000){
+        if(Now-lastTHTime >= interval){
                 lastTHTime = Now;
                 float h = dht.readHumidity(); //Lee humedad
                 float t = dht.readTemperature(); //Lee temperatura
@@ -59,11 +60,11 @@ void THControl(unsigned long Now){
                 else { // Envía los datos
                         ErrorTH = false;
                         lastValidTH = Now;
-                }
-                if(send){
+                        if(send){
                         mySerial.print(t);
                         mySerial.print(":");
                         mySerial.println(h);
+                        }
                 }
                 if(ErrorTH){
                         if(Now-lastErrorTH >=IntervalErrorTH){

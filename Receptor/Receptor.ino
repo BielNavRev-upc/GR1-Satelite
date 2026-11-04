@@ -4,12 +4,15 @@ SoftwareSerial mySerial(10, 11); // RX, TX
 const int ledHeartbeat = 7;
 const int ledErrorTH = 8;
 
+bool errorState = false;
 unsigned long heartbeatLedStart = 0;
 bool heartbeatLED = false;
 const unsigned long heartbeatDuration = 1000; // Dura 1s
 
 unsigned long lastErrorHTTime = 0;
-const unsigned long errorTimeoutTH = 1000;
+const unsigned long errorTimeoutTH = 5000;
+unsigned long lastValidData = 0;
+
 void setup() {
    // Inicializa el puerto serie principal
    Serial.begin(9600);
@@ -37,9 +40,11 @@ void SatComm(){
          heartbeatLED = true;
       } else if (infoSat == "ErrorTH"){
          lastErrorHTTime = millis();
-         digitalWrite(ledErrorTH,HIGH);
+         errorState = true;
       } else {
          Serial.println(infoSat);
+         lastValidData = millis();
+         errorState = false;
       }
    }
 }
@@ -61,9 +66,13 @@ void updateLED(unsigned long Now){
    }
 
    // Apagar LED del Error si no llega ErrorTH
-   if(digitalRead(ledErrorTH)==HIGH){
-      if(Now-lastErrorHTTime > errorTimeoutTH){
-         digitalWrite(ledErrorTH, HIGH);
-      }
+   bool error = errorState;
+   if(!error && (Now-lastValidData > errorTimeoutTH)){
+      error = true;
+   }
+   if(error){
+      digitalWrite(ledErrorTH,HIGH);
+   } else {
+      digitalWrite(ledErrorTH,LOW);
    }
 }
