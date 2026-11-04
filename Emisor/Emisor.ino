@@ -1,9 +1,16 @@
 // Variables globales
 const int led1=12;
-bool enviar = false;
+bool send = false;
 const long interval=2000;
-bool stateLed1=LOW;
-unsigned long prevmillis = 0;
+bool ErrorTH=false;
+
+unsigned long lastHeartbeat = 0;
+unsigned long heartbeatInterval = 3000; // 3s señal de vida
+unsigned long lastTHTime = 0;
+unsigned long lastValidTH = 0;
+const unsigned long TimeoutTH = 5000; // 5s de timeout
+unsigned long lastErrorTH = 0;
+const unsigned long IntervalErrorTH = 500; // 500ms entre envios de señal de error
 
 #include <SoftwareSerial.h>
 #include <DHT.h>
@@ -14,9 +21,6 @@ unsigned long prevmillis = 0;
 DHT dht(DHTPIN, DHTTYPE);
 SoftwareSerial mySerial(10, 11); //// Configuración de puerto serie; RX, TX
 void setup() {
-        // Configura el pin del LED como salida digital
-        pinMode(led1, OUTPUT);
-        //nextMillis1 = millis() + interval1;
         // Inicializa el puerto serie por software
         mySerial.begin(9600);
         mySerial.println("Empezamos");
@@ -26,38 +30,53 @@ void setup() {
         dht.begin();
 }
 void loop() {
-        // Ya toca cambiar, alterna el estado del led
-        if (stateLed1 == LOW)
-                stateLed1 = HIGH;
-        else
-                stateLed1 = LOW;
-        // Aplica el cambio de estado
-        digitalWrite(led1, stateLed1);
-        // Siguiente instante en el que habrá que cambiar
-        LeerMensaje();
-        // Lee si hay algún mensaje de la interfaz
-        if(enviar && (millis()-prevmillis >= interval)){
-                LeerTempHum();
+        unsigned long Now = millis();
+        ReadCommand();
+        THControl(Now);
+        Heartbeat(Now);
+}
+void ReadCommand(){
+        if (mySerial.available()>0){
+                char mensaje = mySerial.read();
+                // Activa el envío de datos si recibe 'i' (Inicio)
+                if(mensaje == 'i'){
+                        send = true;
+                } else if (mensaje == 'p'){ // Desactiva el envío de datos si recibe 'p' (Parar)
+                        send = false;
+                }
         }
 }
-void LeerMensaje(){
-        char mensaje = mySerial.read();
-        // Activa el envío de datos si recibe 'i' (Inicio)
-        if(mensaje == 'i'){
-                enviar = true;
-        } else if (mensaje == 'p'){ // Desactiva el envío de datos si recibe 'p' (Parar)
-                enviar = false;
+void THControl(unsigned long Now){
+        if(Now-lastValidTH >= 2000){
+                lastTHTime = Now;
+                float h = dht.readHumidity(); //Lee humedad
+                float t = dht.readTemperature(); //Lee temperatura
+
+                if (isnan(h) || isnan(t)) // Comprueba si ha ocurrido algún error al leer
+                        if(Now - lastValidTH > TimeoutTH){
+                                ErrorTH = true;
+                        }
+                else { // Envía los datos
+                        ErrorTH = false;
+                        lastValidTH = Now;
+                }
+                if(send){
+                        mySerial.print(t);
+                        mySerial.print(":");
+                        mySerial.println(h);
+                }
+                if(ErrorTH){
+                        if(Now-lastErrorTH >=IntervalErrorTH){
+                                lastErrorTH = Now;
+                                mySerial.println("ErrorTH");
+                        }
+                }
         }
 }
-void LeerTempHum(){
-        prevmillis = millis();
-        float h = dht.readHumidity(); //Lee humedad
-        float t = dht.readTemperature(); //Lee temperatura
-        if (isnan(h) || isnan(t)) // Comprueba si ha ocurrido algún error al leer
-                Serial.println("Error al leer el sensor DHT11");
-        else { // Envía los datos
-                mySerial.print(t);
-                mySerial.print(":");
-                mySerial.println(h);
+// Enviar heartbeat cada 3s (heartbeatInterval)
+void Heartbeat(unsigned long Now){
+        if(Now-lastHeartbeat >= heartbeatInterval){
+                lastHeartbeat = Now;
+                mySerial.println("Heartbeat");
         }
 }
