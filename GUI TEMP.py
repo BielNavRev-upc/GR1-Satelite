@@ -1,6 +1,6 @@
 #importar bibliotecas
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from matplotlib.figure import Figure
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg 
+from matplotlib.figure import Figure 
 import serial
 from tkinter import *
 import threading
@@ -16,7 +16,7 @@ datostemp = [] #lista datos
 fig = Figure(figsize=(5, 4), dpi=100)
 ax = fig.add_subplot(111)
 
-def LeerDatos ():
+def LeerDatos (): 
     global dibujar, datostemp #uso variabes gobales
     while True:
         try: #controlamos que se reciban bien los datos
@@ -26,9 +26,9 @@ def LeerDatos ():
                 Temp = float(TempHum[0])
                 Hum = float(TempHum[1])
                 print(f"Temp: {Temp} | Hum: {Hum}") #muestra en terminal los datos
-
+                
                 datostemp.append(Temp) #añade la temperatura a la lista de datos
-
+                
                 # Para tener la lista con los puntos especificados en puntosMAX
                 if len(datostemp) > puntosMAX:
                     datostemp.pop(0) #elimina el dato mas antiguo
@@ -45,13 +45,12 @@ def ActualizarGrafico():
         ax.set_ylabel("Temperatura")
         ax.set_xlabel("Tiempo")
         ax.set_xlim(0,puntosMAX)
-        ax.tick_params(axis='x', which='both', length=0, labelbottom=False)
-        ax.set_ylim(20, 35)
+        ax.set_ylim(15, 35) 
         canvas.draw() #actualiza la grafica
 
     window.after(100,ActualizarGrafico) #actualiza cada 100 milisegundos
-
-threading.Thread(target=LeerDatos, daemon = True).start() #El daemon=True indica que son codigos que pueden no
+    
+threading.Thread(target=LeerDatos, daemon = True).start() #El daemon=True indica que son codigos que pueden no 
                                                           # considerarse acabados al cerrar el programa de python
 
 def IniciarClick ():
