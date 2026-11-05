@@ -1,11 +1,18 @@
 // Variables globales
-const int led1=12;
-const int led2=13;
-bool enviar = false;
-const long interval=2000;
-bool stateLed1=LOW;
-bool stateLed2=LOW;
-unsigned long prevmillis = 0;
+bool sendTH = false;
+bool errorTH = false;
+
+const long intervalTH=2000;
+const long intervalHeartbeat = 3000;
+const long THerrorTimeout = 5000;
+const long SendErrorTHInterval = 1000;
+
+unsigned long lastTH = 0;
+unsigned long lastHeartbeat = 0;
+unsigned long lastSentErrorTH = 0;
+unsigned long lastErrorTH = 0;
+unsigned long lastValidTH = 0;
+unsigned long Now;
 
 #include <SoftwareSerial.h>
 #include <DHT.h>
@@ -15,65 +22,63 @@ unsigned long prevmillis = 0;
 // Instancia del sensor DHT (en el pin 2)
 DHT dht(DHTPIN, DHTTYPE);
 SoftwareSerial mySerial(10, 11); //// Configuración de puerto serie; RX, TX
+
 void setup() {
-        // Configura el pin del LED como salida digital
-        pinMode(led1, OUTPUT);
-        //nextMillis1 = millis() + interval1;
         // Inicializa el puerto serie por software
         mySerial.begin(9600);
-        mySerial.println("Empezamos");
         // Inicializa el puerto serie por hardware
         Serial.begin(9600);
         // Inicialización del sensor
         dht.begin();
 }
+
 void loop() {
-         SenyalLatido();
-        // Ya toca cambiar, alterna el estado del led
-        if (stateLed1 == LOW)
-                stateLed1 = HIGH;
-        else
-                stateLed1 = LOW;
-        // Aplica el cambio de estado
-        digitalWrite(led1, stateLed1);
-        // Siguiente instante en el que habrá que cambiar
-        LeerMensaje();
-        // Lee si hay algún mensaje de la interfaz
-        if(enviar && (millis()-prevmillis >= interval)){
-                LeerTempHum();
+        Now = millis();
+        SatComm(); // Lee si hay algún mensaje de la interfaz
+        if(Now-lastHeartbeat >= intervalHeartbeat){
+                Heartbeat(Now);
         }
-        else if(millis()-prevmillis>5000){
-                Serial.print("Fallo de lectura");
-                if (stateLed2 == LOW){
-                  stateLed2 = HIGH;
-                }
-                else{
-                  stateLed2 = LOW;
-                }
-        } //Si pasan más de 5 segundos entre lecturas, 
-          //entonces hay un error de lectura y el arduino satélite lo avisa
+        if(sendTH && (Now-lastTH >= intervalTH)){
+                THControl(Now);
+        }
+        if(sendTH){
+                ErrorTHCheck(Now); //Controla si hay un error en el sensor DHT
+        }
 }
-void LeerMensaje(){
-        char mensaje = mySerial.read();
+
+void SatComm(){
+        char GroundCMD = mySerial.read();
         // Activa el envío de datos si recibe 'i' (Inicio)
-        if(mensaje == 'i'){
-                enviar = true;
-        } else if (mensaje == 'p'){ // Desactiva el envío de datos si recibe 'p' (Parar)
-                enviar = false;
+        if(GroundCMD == 'i'){
+                sendTH = true;
+                lastValidTH = millis(); //Arranca la ventana de 5s de timeout del DHT
+        } else if (GroundCMD == 'p'){ // Desactiva el envío de datos si recibe 'p' (Parar)
+                sendTH = false;
         }
 }
-void LeerTempHum(){
-        prevmillis = millis();
+void Heartbeat(unsigned long Now){
+        mySerial.println("Heartbeat");
+        lastHeartbeat = Now;
+
+}
+void THControl(unsigned long Now){
+        lastTH = Now;
         float h = dht.readHumidity(); //Lee humedad
         float t = dht.readTemperature(); //Lee temperatura
-        if (isnan(h) || isnan(t)) // Comprueba si ha ocurrido algún error al leer
-                Serial.println("Error al leer el sensor DHT11");
-        else { // Envía los datos
+        if (isnan(h) || isnan(t)){ // Comprueba si ha ocurrido algún error al leer
+         // Si no lee nada no actualiza la lectura valida
+        } else { // Envía los datos
                 mySerial.print(t);
                 mySerial.print(":");
                 mySerial.println(h);
+                lastValidTH = Now; // Actu Ultima lectura valida
         }
 }
-void SenyalLatido(){
-   char senyal_vida = mySerial.print("Life");
+void ErrorTHCheck(unsigned long Now){
+        if(Now-lastValidTH >= THerrorTimeout){
+                if(Now - lastErrorTH >= SendErrorTHInterval){
+                        mySerial.println("ErrorTH");
+                        lastErrorTH = Now;
+                }
+        }
 }
