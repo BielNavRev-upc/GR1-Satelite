@@ -11,6 +11,8 @@ unsigned long lastTH = 0;
 unsigned long lastHeartbeat = 0;
 unsigned long lastSentErrorTH = 0;
 unsigned long lastErrorTH = 0;
+unsigned long lastValidTH = 0;
+unsigned long Now;
 
 #include <SoftwareSerial.h>
 #include <DHT.h>
@@ -24,7 +26,6 @@ SoftwareSerial mySerial(10, 11); //// Configuración de puerto serie; RX, TX
 void setup() {
         // Inicializa el puerto serie por software
         mySerial.begin(9600);
-        mySerial.println("Empezamos");
         // Inicializa el puerto serie por hardware
         Serial.begin(9600);
         // Inicialización del sensor
@@ -34,21 +35,25 @@ void setup() {
 void loop() {
         Now = millis();
         SatComm(); // Lee si hay algún mensaje de la interfaz
-        if(Now-lastheartbeat >= intervalHearbeat){
+        if(Now-lastHeartbeat >= intervalHeartbeat){
                 Heartbeat(Now);
         }
         if(sendTH && (Now-lastTH >= intervalTH)){
                 THControl(Now);
         }
+        if(sendTH){
+                ErrorTHCheck(Now); //Controla si hay un error en el sensor DHT
+        }
 }
 
 void SatComm(){
-        char mensaje = mySerial.read();
+        char GroundCMD = mySerial.read();
         // Activa el envío de datos si recibe 'i' (Inicio)
-        if(mensaje == 'i'){
-                enviar = true;
-        } else if (mensaje == 'p'){ // Desactiva el envío de datos si recibe 'p' (Parar)
-                enviar = false;
+        if(GroundCMD == 'i'){
+                sendTH = true;
+                lastValidTH = millis(); //Arranca la ventana de 5s de timeout del DHT
+        } else if (GroundCMD == 'p'){ // Desactiva el envío de datos si recibe 'p' (Parar)
+                sendTH = false;
         }
 }
 void Heartbeat(unsigned long Now){
@@ -60,21 +65,20 @@ void THControl(unsigned long Now){
         lastTH = Now;
         float h = dht.readHumidity(); //Lee humedad
         float t = dht.readTemperature(); //Lee temperatura
-        if (isnan(h) || isnan(t)) // Comprueba si ha ocurrido algún error al leer
-                errorTH = true;
-                lastErrorTH = Now;
-        else { // Envía los datos
+        if (isnan(h) || isnan(t)){ // Comprueba si ha ocurrido algún error al leer
+         // Si no lee nada no actualiza la lectura valida
+        } else { // Envía los datos
                 mySerial.print(t);
                 mySerial.print(":");
                 mySerial.println(h);
-                errorTH = false;
+                lastValidTH = Now; // Actu Ultima lectura valida
         }
-        if (errorTH){
-                if (Now - lastErrorTH >= THerrorTimeout){
-                if (Now - lastSentErrorTH >= SendErrorTHInterval){
+}
+void ErrorTHCheck(unsigned long Now){
+        if(Now-lastValidTH >= THerrorTimeout){
+                if(Now - lastErrorTH >= SendErrorTHInterval){
                         mySerial.println("ErrorTH");
-                        lastSentErrorTH = Now;
+                        lastErrorTH = Now;
                 }
-        }
         }
 }
