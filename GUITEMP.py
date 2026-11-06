@@ -1,12 +1,12 @@
 #importar bibliotecas
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
-import serial
 from tkinter import *
+import serial
 import threading
 import time
 
-ser = serial.Serial("/dev/ttyACM0",baudrate=9600, timeout = 1) # ComX en windows, substituir X por el que toque
+ser = serial.Serial("/dev/ttyACM2",baudrate=9600, timeout = 1) # ComX en windows, substituir X por el que toque
 puntosMAX = 100 #limite puntos que se muestran
 
 dibujar = True #variable para actualizar el grafico

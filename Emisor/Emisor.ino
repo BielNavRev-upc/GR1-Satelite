@@ -2,7 +2,7 @@
 bool sendTH = false;
 bool errorTH = false;
 
-const long intervalTH=2000;
+const long intervalTH=1750;
 const long intervalHeartbeat = 3000;
 const long THerrorTimeout = 5000;
 const long SendErrorTHInterval = 1000;
