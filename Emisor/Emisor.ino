@@ -1,11 +1,11 @@
 // Variables globales
 bool sendTH = false;
-bool errorTH = false; 
+bool errorTH = false;
 
-const long intervalTH=2000; //Intervalo de envio de datos del sensor DHT
-const long intervalHeartbeat = 3000; // Intervalo de señal de vida
-const long THerrorTimeout = 5000; // Timeout del sensor DHT
-const long SendErrorTHInterval = 1000; //Cada cuantos segundos envia el señal de error
+const long intervalTH=2000;
+const long intervalHeartbeat = 3000;
+const long THerrorTimeout = 5000;
+const long SendErrorTHInterval = 1000;
 
 unsigned long lastTH = 0;
 unsigned long lastHeartbeat = 0;
@@ -33,20 +33,20 @@ void setup() {
 }
 
 void loop() {
-        Now = millis(); // Hace que los relojes esten sincronizados
-        SatComm(); // Llama a la funcion que se comunica con la estación de tierra
-        if(Now-lastHeartbeat >= intervalHeartbeat){ // Llama a la funcion de señal de vida cada intervalo y da de parametro "Now"
+        Now = millis();
+        SatComm(); // Lee si hay algún mensaje de la interfaz
+        if(Now-lastHeartbeat >= intervalHeartbeat){
                 Heartbeat(Now);
         }
-        if(sendTH && (Now-lastTH >= intervalTH)){ // Llama a la funcion del sensor DHT cada intervalo con el parametro "Now"
+        if(sendTH && (Now-lastTH >= intervalTH)){
                 THControl(Now);
         }
-        if(sendTH){ // Si esta el envio de datos activo llama a la funcion que comprueba si hay un error en el DHT con el parametro "Now"
-                ErrorTHCheck(Now);
+        if(sendTH){
+                ErrorTHCheck(Now); //Controla si hay un error en el sensor DHT
         }
 }
 
-void SatComm(){ // Lee si hay algún mensaje de la interfaz
+void SatComm(){
         char GroundCMD = mySerial.read();
         // Activa el envío de datos si recibe 'i' (Inicio)
         if(GroundCMD == 'i'){
@@ -56,27 +56,29 @@ void SatComm(){ // Lee si hay algún mensaje de la interfaz
                 sendTH = false;
         }
 }
-void Heartbeat(unsigned long Now){ // Controla el envio de la señal de vida a la estacion de tierra
-        mySerial.println("Heartbeat");
+void Heartbeat(unsigned long Now){
+        mySerial.println("1:HB");
         lastHeartbeat = Now;
+
 }
-void THControl(unsigned long Now){ // Controla la lectura de datos del sensor DHT
-        lastTH = Now; // Registra cuando empieza la función
+void THControl(unsigned long Now){
+        lastTH = Now;
         float h = dht.readHumidity(); //Lee humedad
         float t = dht.readTemperature(); //Lee temperatura
         if (isnan(h) || isnan(t)){ // Comprueba si ha ocurrido algún error al leer
          // Si no lee nada no actualiza la lectura valida
         } else { // Envía los datos
+                mySerial.print("2:");
                 mySerial.print(t);
                 mySerial.print(":");
                 mySerial.println(h);
                 lastValidTH = Now; // Actu Ultima lectura valida
         }
 }
-void ErrorTHCheck(unsigned long Now){ // Comprueba si ha pasado el timeout del error del DHT
+void ErrorTHCheck(unsigned long Now){
         if(Now-lastValidTH >= THerrorTimeout){
                 if(Now - lastErrorTH >= SendErrorTHInterval){
-                        mySerial.println("ErrorTH");
+                        mySerial.println("2:ETH");
                         lastErrorTH = Now;
                 }
         }

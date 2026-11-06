@@ -46,7 +46,7 @@ def ActualizarGrafico():
         ax.set_xlabel("Tiempo")
         ax.set_xlim(0,puntosMAX)
         ax.tick_params(axis='x', which='both', length=0, labelbottom=False)
-        ax.set_ylim(20, 35)
+        ax.set_ylim(10, 50)
         canvas.draw() #actualiza la grafica
 
     window.after(100,ActualizarGrafico) #actualiza cada 100 milisegundos
