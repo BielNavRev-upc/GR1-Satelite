@@ -2,7 +2,7 @@
 bool sendTH = false;
 bool errorTH = false;
 
-const long intervalTH=1750;
+const long intervalTH=2000;
 const long intervalHeartbeat = 3000;
 const long THerrorTimeout = 5000;
 const long SendErrorTHInterval = 1000;
@@ -34,32 +34,28 @@ void setup() {
 
 void loop() {
         Now = millis();
-        SatComm(); // Lee si hay algún mensaje de la interfaz
+        SatComm(Now); // Lee si hay algún mensaje de la interfaz
         if(Now-lastHeartbeat >= intervalHeartbeat){
                 Heartbeat(Now);
         }
         if(sendTH && (Now-lastTH >= intervalTH)){
                 THControl(Now);
         }
-        if(sendTH){
-                ErrorTHCheck(Now); //Controla si hay un error en el sensor DHT
-        }
 }
 
-void SatComm(){
+void SatComm(unsigned long Now){
         char GroundCMD = mySerial.read();
         // Activa el envío de datos si recibe 'i' (Inicio)
         if(GroundCMD == 'i'){
                 sendTH = true;
-                lastValidTH = millis(); //Arranca la ventana de 5s de timeout del DHT
+                lastValidTH = Now; //Arranca la ventana de 5s de timeout del DHT
         } else if (GroundCMD == 'p'){ // Desactiva el envío de datos si recibe 'p' (Parar)
                 sendTH = false;
         }
 }
 void Heartbeat(unsigned long Now){
-        mySerial.println("1:HB");
+        mySerial.println("1:");
         lastHeartbeat = Now;
-
 }
 void THControl(unsigned long Now){
         lastTH = Now;
@@ -70,16 +66,7 @@ void THControl(unsigned long Now){
         } else { // Envía los datos
                 mySerial.print("2:");
                 mySerial.print(t);
-                mySerial.print(":");
+                mySerial.print(";");
                 mySerial.println(h);
-                lastValidTH = Now; // Actu Ultima lectura valida
-        }
-}
-void ErrorTHCheck(unsigned long Now){
-        if(Now-lastValidTH >= THerrorTimeout){
-                if(Now - lastErrorTH >= SendErrorTHInterval){
-                        mySerial.println("2:ETH");
-                        lastErrorTH = Now;
-                }
         }
 }
