@@ -9,19 +9,32 @@ import time
 #Declaracion estilo GUI
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
-colorGraficaExt = "#FFFFFF"
-colorFrameGrafica = "#242526"
-colorFondoGrafico = "#313D49"
 tituloFrame1 = "Grafica de temperatura y humedad"
 
-#Inicio del serial
-try:
-    ser = serial.Serial("/dev/ttyACM0",baudrate=9600, timeout = 1) # ComX en windows, substituir X por el que toque
-    SerOpen = True
-except:
-    print("No se ha podido abrir el puerto serie")
-    SerOpen = False
+# Diccionario colores configurables
+ColoresConfigurablesOriginales = {
+    "graficaBordes": "#FFFFFF",
+    "graficaFondo": "#313D49",
+    "colorLTemp": "#C72020",
+    "colorLHum": "#2C2CAD"
+}
+ColoresConfigurables = ColoresConfigurablesOriginales.copy() # El programa usará una copia de los colores originales para cambiarlos.
 
+#Variables globales
+puntosMAX = 150 #limite puntos que se muestran en la grafica
+dibujar = True #Dibuja el gràfico
+datosTemp = []
+datosHum = []
+ErrorSensorDHT = False
+ser = None
+SerOpen = False
+# Contador HB
+ultimoHeartbeat = 0
+
+# Diccionario donde se guardan las referencias a los indicadores que se crearan mas abajo.
+Indicadores = {}
+
+#Inicio del serial
 def AbrirSerial():
     global ser, SerOpen
     try:
@@ -31,28 +44,16 @@ def AbrirSerial():
         print("No se ha podido abrir el puerto serie")
         SerOpen = False
 
-#Variables globales
-puntosMAX = 150 #limite puntos que se muestran en la grafica
-dibujar = True #Dibuja el gràfico
-datosTemp = []
-datosHum = []
-ErrorSensorDHT = False
-
-# Contador HB
-ultimoHeartbeat = 0
-
-# Diccionario donde se guardan las referencias a los indicadores que se crearan mas abajo.
-Indicadores = {}
-
 #Grafica
 graf = Figure(figsize=(5,4),dpi=100)
 ax = graf.add_subplot(111)
+graf.patch.set_facecolor("#242526")
 
-graf.patch.set_facecolor(colorFrameGrafica)
 #Funciones
 def HeartbeatIndicator(): # Indicador heartbeat, misma logica que en el arduino.
     global ultimoHeartbeat
     ultimoHeartbeat = time.time()
+    
 def SensorDHT(Datos):
     global datosTemp,datosHum,ErrorSensorDHT
     if Datos == "E":
@@ -69,6 +70,7 @@ def SensorDHT(Datos):
     if len(datosTemp) > puntosMAX:
         datosTemp.pop(0) #elimina el dato mas antiguo
         datosHum.pop(0) 
+
 def LeerDatos ():
     global ErrorSensorDHT
     while SerOpen:
@@ -85,24 +87,27 @@ def LeerDatos ():
         except Exception as e:
             print(f"Error: {e}")
             time.sleep(0.1) #pausa
+            
 threading.Thread(target=LeerDatos, daemon = True).start() #El daemon=True indica que son codigos que pueden no considerarse acabados al cerrar el programa de python
 # Como el hilo de LeerDatos es diferente al del hilo principal que gestiona la ventana, hay que separar funciones que actualicen el GUI de las que funcionan en el fondo para
 # que no haya errores entre ellas
+
 def ActualizarInterfaz(): # Funcion que se encarga de actualizar la GUI con los datos nuevos y con la informacion de las alarmas?
     global dibujar, datosTemp,datosHum,ultimoHeartbeat
     if dibujar:
         ax.clear() #limpia el grafico
-        ax.set_facecolor(colorFondoGrafico)
-        ax.plot(range(len(datosTemp)),datosTemp,color="r",label="Temperatura") #dibuja Temperatura
-        ax.plot(range(len(datosHum)),datosHum,color="b",label="Humedad") #dibuja Humedad
+        ax.set_facecolor(ColoresConfigurables["graficaFondo"])
+        ax.plot(range(len(datosTemp)),datosTemp,color=ColoresConfigurables["colorLTemp"],label="Temperatura") #dibuja Temperatura
+        ax.plot(range(len(datosHum)),datosHum,color=ColoresConfigurables["colorLHum"],label="Humedad") #dibuja Humedad
         ax.legend()
-        ax.set_title("Datos Temperatura y humedad",color=colorGraficaExt)
-        ax.set_ylabel("Temperatura y humedad",color=colorGraficaExt)
-        ax.set_xlabel("Tiempo",color=colorGraficaExt)
+        ColorBorde = ColoresConfigurables["graficaBordes"]
+        ax.set_title("Datos Temperatura y humedad",color=ColorBorde)
+        ax.set_ylabel("Temperatura y humedad",color=ColorBorde)
+        ax.set_xlabel("Tiempo",color=ColorBorde)
         ax.set_xlim(0,puntosMAX)
-        ax.tick_params(axis='both',which='both',color=colorGraficaExt,labelcolor=colorGraficaExt)
+        ax.tick_params(axis='both',which='both',color=ColorBorde,labelcolor=ColorBorde)
         for spine in ax.spines.values():
-            spine.set_color(colorGraficaExt)
+            spine.set_color(ColorBorde)
         ax.tick_params(axis='x', which='both', length=0, labelbottom=False)
         ax.set_ylim(10, 90)
         canvas.draw() #actualiza la grafica
@@ -125,56 +130,84 @@ def ActualizarInterfaz(): # Funcion que se encarga de actualizar la GUI con los 
 
     window.after(100,ActualizarInterfaz) #actualiza cada 100 milisegundos
 
-def SeleccionColores(): #Funcion de subventana para cambiar los colores
-    SetColores = ctk.CTkToplevel()
-    SetColores.title("Selección de colores")
-    SetColores.geometry("500x500")
-    SetColores.grid_rowconfigure(0,weight=1)
-    SetColores.grid_rowconfigure(1,weight=1)
-    SetColores.grid_rowconfigure(2,weight=1)
-    SetColores.grid_columnconfigure(0,weight=1)
+class BotonColores(ctk.CTkButton):
+    def __init__(self, master,titulo,LlaveColor,CambioCallback,**kwargs): # El '**kwargs' son opciones adicionales del boton como el color, el tamaño etc, se usa para que quede limpio
+        '''El super va a el parent de la clase, el "ctk.CTkButon", y hace que haga su setup, es decir, como si haces x = ctk.CTkButon(master) normalmente(fuera de la clase)'''
+        super().__init__(master,text=titulo, **kwargs)
 
-    #Funciones de los botones
-    def ResetColores():
-        global colorGraficaExt,colorFondoGrafico
-        colorGraficaExt = "#FFFFFF"
-        colorFondoGrafico = "#313D49"
+        # Guarda el "DNI" del color (la llave) y el callback dentro del objeto
+        self.LlaveColor = LlaveColor
+        self.CambioCallback = CambioCallback
+        # Asigna a que funcion apunta el comando
+        self.configure(command=self._Click)
 
-    def BordeGraficaTH():
-        global colorGraficaExt
-        dialog = ctk.CTkInputDialog(text="Introduzca un color en hexadecimal en formato '#XXXXXX'",title="Color Borde y titulos Grafica")
-        ColorBorde = dialog.get_input()
-        if ColorBorde.startswith('#') and len(ColorBorde) == 7:
-            colorGraficaExt = ColorBorde
+    def _Click(self):
+        dialog = ctk.CTkInputDialog(text="Introduzca un color en hexadecimal '#XXXXXX'",title="Color Nuevo")
+        ColorNuevo = dialog.get_input()
 
-    def FondoGrafTH():
-        global colorFondoGrafico
-        dialog = ctk.CTkInputDialog(text="Introduzca un color en hexadecimal en formato '#XXXXXX'",title="Color Fondo Grafica")
-        ColorFondo = dialog.get_input()
-        if ColorFondo.startswith('#') and len(ColorFondo) == 7:
-            colorFondoGrafico = ColorFondo
+        #Comprobación de que el input es un codigo valido
+        if ColorNuevo.startswith('#') and len(ColorNuevo) == 7: 
+            #Una vez verificado, el "callback" pone el color nuevo donde dice la llave (su DNI)
+            self.CambioCallback(self.LlaveColor,ColorNuevo)
 
-    #Botones Cambio de color
-    ResetColorBoton = ctk.CTkButton(SetColores,text="Reset colores",command=ResetColores, font=("Roboto",18))
-    ResetColorBoton.grid(row=0,column=0,padx=5,pady=5,sticky="nsew")
-    BordeGrafBoton = ctk.CTkButton(SetColores,text="Color del borde de la grafica",command=BordeGraficaTH, font=("Roboto",18))
-    BordeGrafBoton.grid(row=1,column=0,padx=5,pady=5,sticky="nsew")
-    FondoGrafBoton = ctk.CTkButton(SetColores,text="Color del Fondo de la grafica",command=FondoGrafTH, font=("Roboto",18))
-    FondoGrafBoton.grid(row=2,column=0,padx=5,pady=5,sticky="nsew")
-                                          
+class ConfiColoresDialog(ctk.CTkToplevel): 
+    #Crear la clase ConfiColoresDialog, que hereda todo lo que "ctk.CTkToplevel" puede hacer (lo que se usa para hacer una ventana de popup)
+    def __init__(self, parent,opciones,CambioCallback,ResetCallback): # Setup de la clase
+        '''El super va a el parent de la clase, el "ctk.CTkToplevel", y hace que haga su setup, es decir, como si haces x = ctk.CTkToplevel(parent) normalmente(fuera de la clase)'''
+        super().__init__(parent) 
+        self.title("Selección de colores")
+        self.geometry("400x500")
+
+        # Hooks de la ventana
+        self.CambioCallback = CambioCallback
+        self.ResetCallback = ResetCallback
+        self.opciones = opciones # Lista de opciones
+
+        self._setupUi()
+
+    def _setupUi(self):
+        #Boton de reset arriba del todo
+        self.BotonReset = ctk.CTkButton(self, text="Reset de colores",command=self.ResetCallback,font=("Roboto",18),fg_color="#C0392B",hover_color="#962D22")
+        self.BotonReset.pack(pady=15,padx=20,fill='x')
+
+        # Marco con barra de scroll
+        self.MarcoScroll = ctk.CTkScrollableFrame(self)
+        self.MarcoScroll.pack(expand = True, fill="both",padx=20,pady=(0,20))
+
+        # Creación de botones de manera modular
+        for titulo, llave in self.opciones: # como options esta compuesta de tuples (parejas de 2 elementos), el bucle for le asigna titulo al primer elemento y llave al 2o
+            BotonColores(self.MarcoScroll,titulo=titulo,LlaveColor=llave,CambioCallback=self.CambioCallback,font=("Roboto",14),width=250).pack(pady=5,padx=10,fill='x')
+
+# Puente entre la UI y los datos
+def CambiarColor(llave, nuevoColor):
+    global ColoresConfigurables
+    ColoresConfigurables[llave] = nuevoColor
+
+def ColorReset():
+    global ColoresConfigurables
+    ColoresConfigurables = ColoresConfigurablesOriginales.copy() # No hace falta declarar coloresConfigurablesOriginales una global pq solo esta leyendo, no reasignando.
+
+def AbrirMenuColores():
+    '''Sitio donde se define la estructura del menu de cambiar colores'''
+    opciones = [
+        ("Borde de la gráfica", "graficaBordes"),
+        ("Fondo de la gráfica", "graficaFondo"),
+        ("Color de la linea de temperatura","colorLTemp"),
+        ("Color de la linea de humedad","colorLHum")
+    ]
+    ConfiColoresDialog(window, opciones,CambiarColor,ColorReset)
+# Fin del puente
+
 #Funciones botones
 def IniciarClick ():
-    global dibujar
-    dibujar = True
-    ser.write("i".encode('utf-8')) #enviamos el mensaje de iniciar
+    if SerOpen:
+        ser.write("i".encode('utf-8')) #enviamos el mensaje de iniciar
 def PararClick ():
-    global dibujar
-    dibujar = False
-    ser.write("p".encode('utf-8')) #enviamos el mensaje de parar
+    if SerOpen:
+        ser.write("p".encode('utf-8')) #enviamos el mensaje de parar
 def ReanudarClick ():
-    global dibujar
-    dibujar = True
-    ser.write("r".encode('utf-8')) #enviamos el mensaje de reanudar
+    if SerOpen:
+        ser.write("r".encode('utf-8')) #enviamos el mensaje de reanudar
 
 # Funcion para crear indicadores de sensores y el heartbeat de manera modular asi no hay que escribirlo muchas veces
 def AgregarIndicador(nombre_texto):
@@ -194,7 +227,8 @@ def AgregarIndicador(nombre_texto):
     # porque? Asi cuando queramos cambiar el color, solo hay que buscar donde esta guardado el objeto y al encontrarlo, usar funciones que permiten
     # cambiar 
     Indicadores[nombre_texto] = cuadrado
-
+#Try inicial de abrir serial
+AbrirSerial()
 #GUI
 window = ctk.CTk()
 window.title("ControlSat")
@@ -243,28 +277,25 @@ titulobotones = ctk.CTkLabel(frame_botones,text="Controles sensor DHT",font=("Ro
 titulobotones.grid(row=0,column=0,columnspan=3,sticky="ew",padx=15,pady=(8,0))
 
 #Botones Marco Superior
-InicioBoton = ctk.CTkButton(frame_botones,text="Iniciar",command=IniciarClick, font=("Roboto",18),fg_color="#98FB98",hover_color="#7AC77A",text_color="black",)
+InicioBoton = ctk.CTkButton(frame_botones,text="Iniciar",command=IniciarClick, font=("Roboto",18),fg_color="pale green",text_color="black",)
 InicioBoton.grid(row=1,column=0,padx=5,pady=5,sticky="nsew")
-PararBoton = ctk.CTkButton(frame_botones,text="Parar",command=PararClick, font=("Roboto",18),fg_color="#FF6347",hover_color="#CC4F39",text_color="black",)
+PararBoton = ctk.CTkButton(frame_botones,text="Parar",command=PararClick, font=("Roboto",18),fg_color="tomato",text_color="black",)
 PararBoton.grid(row=1,column=1,padx=5,pady=5,sticky="nsew")
-ReanudarBoton = ctk.CTkButton(frame_botones,text="Reanudar",command=ReanudarClick, font=("Roboto",18),fg_color="#FFC125",hover_color="#CC991E",text_color="black",)
+ReanudarBoton = ctk.CTkButton(frame_botones,text="Reanudar",command=ReanudarClick, font=("Roboto",18),fg_color="goldenrod1",text_color="black",)
 ReanudarBoton.grid(row=1,column=2,padx=5,pady=5,sticky="nsew")
 
 #Marco inferior de los botones
 frameInf_botones = ctk.CTkFrame(window)
 frameInf_botones.grid(row=3,column=0,padx=20,pady=10,sticky="nsew")
 frameInf_botones.rowconfigure(0,weight=0)
-frameInf_botones.rowconfigure(1,weight=1)
 frameInf_botones.columnconfigure(0,weight=1)
 frameInf_botones.columnconfigure(1,weight=1)
-tituloInfbotones = ctk.CTkLabel(frameInf_botones,text="Configuración",font=("Roboto",15),anchor="w")
-tituloInfbotones.grid(row=0,column=0,columnspan=3,sticky="ew",padx=15,pady=(8,0))
 
 #Botones marco inferior
 InicioBoton = ctk.CTkButton(frameInf_botones,text="Abrir Puerto serie",command=AbrirSerial, font=("Roboto",18))
-InicioBoton.grid(row=1,column=0,padx=5,pady=5,sticky="nsew")
-PararBoton = ctk.CTkButton(frameInf_botones,text="Colores",command=SeleccionColores, font=("Roboto",18))
-PararBoton.grid(row=1,column=1,padx=5,pady=5,sticky="nsew")
+InicioBoton.grid(row=0,column=0,padx=5,pady=5,sticky="nsew")
+PararBoton = ctk.CTkButton(frameInf_botones,text="Abrir config de colores",command=AbrirMenuColores, font=("Roboto",18))
+PararBoton.grid(row=0,column=1,padx=5,pady=5,sticky="nsew")
 
 window.after(100,ActualizarInterfaz) #llama a la funcion que hace que el grafico y las alarmas tengan la nueva informacion
 
