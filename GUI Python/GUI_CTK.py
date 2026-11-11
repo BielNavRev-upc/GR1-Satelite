@@ -18,7 +18,7 @@ tituloMCentral = "Grafica TH"
 # Diccionario de colores customizables
 ColoresConfigurables = {
     "graficaBordes":"#FFFFFF",
-    "graficaFondo":"#313D49",
+    "graficaFondo":"#57636E",
     "colorLTemp": "#C72020",
     "colorLHum": "#2C2CAD"
 }
@@ -169,13 +169,13 @@ def ColorPopUp():
 
 def IniciarClick ():
     if serOpen:
-        ser.write("i\n".encode('utf-8')) #enviamos el mensaje de iniciar
+        ser.write("iTH\n".encode('utf-8')) #enviamos el mensaje de iniciar
 def PararClick ():
     if serOpen:
-        ser.write("p\n".encode('utf-8')) #enviamos el mensaje de parar
+        ser.write("pTH\n".encode('utf-8')) #enviamos el mensaje de parar
 def ReanudarClick ():
     if serOpen:
-        ser.write("r\n".encode('utf-8')) #enviamos el mensaje de reanudar
+        ser.write("rTH\n".encode('utf-8')) #enviamos el mensaje de reanudar
 
 # Funcion para crear indicadores de sensores y el heartbeat de manera modular asi no hay que escribirlo muchas veces
 def AgregarIndicador(nombre_texto):
@@ -209,15 +209,23 @@ threading.Thread(target=LeerDatos, daemon = True).start()
 window = ctk.CTk()
 window.title("ControlSat")
 window.geometry("1920x1080") # Tamaño de la ventana en pixeles
-window.grid_rowconfigure(0,weight=0)
+window.grid_rowconfigure(0,weight=1)
 window.grid_rowconfigure(1,weight=3)
 window.grid_rowconfigure(2,weight=2)
 window.grid_rowconfigure(2,weight=2)
 window.grid_columnconfigure(0,weight=1)
 
-#Configuración del titulo
-tituloLabel = ctk.CTkLabel(window, text="Sistema satelital",font=("Roboto",22))
-tituloLabel.grid(row=0,column=0,columnspan=3,padx=5,pady=5,sticky="nsew")
+# Configuración parte de Arriba
+# Marco Principal
+MarcoArriba = ctk.CTkFrame(window, bg_color="transparent")
+MarcoArriba.grid(row=0,column=0,sticky="nsew")
+# Configuración del titulo
+tituloLabel = ctk.CTkLabel(MarcoArriba, text="Sistema satelital",font=("Roboto",22))
+tituloLabel.pack(expand=True)
+# Boton colores
+ColorPopUpBoton = ctk.CTkButton(MarcoArriba,text="⚙️",command=ColorPopUp,font=("Roboto",28),width=40, 
+    height=40,)
+ColorPopUpBoton.place(relx=1.0,rely=0.5,anchor="e",x=-10)
 
 #Marco central
 MarcoCentral = ctk.CTkFrame(window)
@@ -266,13 +274,10 @@ frameInf_botones = ctk.CTkFrame(window)
 frameInf_botones.grid(row=3,column=0,padx=20,pady=10,sticky="nsew")
 frameInf_botones.rowconfigure(0,weight=0)
 frameInf_botones.columnconfigure(0,weight=1)
-frameInf_botones.columnconfigure(1,weight=1)
 
 #Botones marco inferior
 AbrirSerialBoton = ctk.CTkButton(frameInf_botones,text="Abrir Puerto serie",command=AbrirSerial, font=("Roboto",18))
 AbrirSerialBoton.grid(row=0,column=0,padx=5,pady=5,sticky="nsew")
-ColorPopUpBoton = ctk.CTkButton(frameInf_botones,text="Abrir config de colores",command=ColorPopUp, font=("Roboto",18))
-ColorPopUpBoton.grid(row=0,column=1,padx=5,pady=5,sticky="nsew")
 
 window.after(100,RefreshGUI) #llama a la funcion que hace que el grafico y las alarmas tengan la nueva informacion
 window.mainloop()

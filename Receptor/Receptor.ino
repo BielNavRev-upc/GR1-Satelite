@@ -45,10 +45,11 @@ void loop(){
 }
 void GroundCMDControl(){
    String GroundCMD = Serial.readStringUntil('\n');
-   if (GroundCMD == "i" || GroundCMD == "r"){ //Si recibe de la interfaz 'i' (Iniciar) o 'r' (Reanudar), envía una "i" al emisor
+   GroundCMD.trim();
+   if (GroundCMD == "iTH" || GroundCMD == "rTH"){ //Si recibe de la interfaz 'i' (Iniciar) o 'r' (Reanudar), envía una "i" al emisor
       mySerial.println("i");
       SendTH = true;
-   } else if (GroundCMD == "p"){ //Si recibe de la interfaz 'p' (Parar), envía una "p" al emisor
+   } else if (GroundCMD == "pTH"){ //Si recibe de la interfaz 'p' (Parar), envía una "p" al emisor
       mySerial.println("p");
       SendTH = false;
    }
