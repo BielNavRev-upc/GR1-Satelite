@@ -46,12 +46,19 @@ void loop(){
 void GroundCMDControl(){
    String GroundCMD = Serial.readStringUntil('\n');
    GroundCMD.trim();
-   if (GroundCMD == "iTH" || GroundCMD == "rTH"){ //Si recibe de la interfaz 'i' (Iniciar) o 'r' (Reanudar), envía una "i" al emisor
-      mySerial.println("i");
-      SendTH = true;
-   } else if (GroundCMD == "pTH"){ //Si recibe de la interfaz 'p' (Parar), envía una "p" al emisor
-      mySerial.println("p");
-      SendTH = false;
+   String ID = GroundCMD.substring(0,2);
+   GroundCMD.remove(0,2);
+   if (ID == "2:"){
+      if (GroundCMD == "i"){ //Si recibe de la interfaz 'i' (Iniciar) o 'r' (Reanudar), envía una "i" al emisor
+         mySerial.println("2:i");
+         SendTH = true;
+      } else if (GroundCMD == "p"){ //Si recibe de la interfaz 'p' (Parar), envía una "p" al emisor
+         mySerial.println("2:p");
+         SendTH = false;
+      } else{
+         mySerial.print(ID);
+         mySerial.println(GroundCMD);
+      }
    }
 }
 void SatFeedControl(String ID,String satFeed,unsigned long Now){ //Controla los datos (el feed) que llega del satelite 

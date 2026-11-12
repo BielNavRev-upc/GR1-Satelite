@@ -9,6 +9,7 @@ import threading
 puntosMax = 150
 datosTemp = []
 datosHum = []
+DHTStatus = False
 ErrorSensorDHT = False
 ser = None
 serOpen = False
@@ -20,14 +21,18 @@ ColoresConfigurables = {
     "graficaBordes":"#FFFFFF",
     "graficaFondo":"#57636E",
     "colorLTemp": "#C72020",
-    "colorLHum": "#2C2CAD"
+    "colorLHum": "#2C2CAD",
+    "colorDHTBoton": "#64BF64",
+    "colorUSOBoton": "#55E9E7"
 }
 # Diccionario con los titulos de los botones de cambio de color
 BotonesModularesColor = {
     "graficaBordes":"Color de los bordes de la grafica",
     "graficaFondo":"Color del fondo de la grafica",
     "colorLTemp": "Color de la linea de temepratura",
-    "colorLHum": "Color de la linea de humedad"
+    "colorLHum": "Color de la linea de humedad",
+    "colorDHTBoton": "Color del boton DHT",
+    "colorUSOBoton": "Color del boton Ultrasonido"
 }
 CustomColoresOriginal = ColoresConfigurables.copy() # Si no se usa el copy el python diria que simplemente son la misma direccion de memoria y no nos quedariamos con los colores originales
 ctk.set_appearance_mode("dark")
@@ -39,7 +44,7 @@ ultimoHB = 0
 # Diccionario de indicadores y alarmas
 Indicadores = {}
 
-#Funcion que abre el serial
+#Gestión del puerto serie
 def AbrirSerial():
     global ser, serOpen
     try:
@@ -48,6 +53,11 @@ def AbrirSerial():
     except:
         print("No se ha podido abrir el puerto serie")
         serOpen = False
+
+def CerrarSerial():
+    global ser, serOpen
+    if serOpen:
+        ser.close()
 
 #Grafica TH
 Graf = Figure(figsize=(5,4),dpi=100)
@@ -115,7 +125,7 @@ def ActuGraf():
     
 # Funcion que actualiza la GUI
 def RefreshGUI():
-    ActuGraf()
+    ActuGraf() ## Funcion que actualiza la grafica
     # Configuracion cuadrados de las alarmas
     # El cuadrado se ha guardado como un objeto, para cambiar su informacion hay que usar la funcion de ".configure", en este caso cambia el color.
     # Los primeros if buscan si el sensor/heartbeat que queremos cambiar esta en el diccionario donde hemos guardado las referencias a los cuadrados.
@@ -131,7 +141,8 @@ def RefreshGUI():
     # El .configure busca en el diccionario donde esta guardado lo que qqueremos cambiar, va a el objeto y le cambia el color.
     Indicadores["Heartbeat"].configure(fg_color=colorHB)
     Indicadores["Sensor DHT"].configure(fg_color=colorDHT)
-
+    InicioBotonDHT.configure(fg_color=ColoresConfigurables["colorDHTBoton"])
+    InicioBotonUSO.configure(fg_color=ColoresConfigurables["colorUSOBoton"])
     window.after(100, RefreshGUI)
 
 # Creación de Botones de cambio de color modulares
@@ -139,9 +150,17 @@ def RefreshGUI():
 def BotonModular(master,variableColor):
     def FuncionBoton():
         global ColoresConfigurables
-        DialogoColor = ctk.CTkInputDialog(text="Introduzca un color en formato hexadecimal #XXXXXX",title="Color nuevo")
+        DialogoColor = ctk.CTkInputDialog(text="Introduzca un color en formato hexadecimal XXXXXX",title="Color nuevo")
         ColorNuevo = DialogoColor.get_input()
-        if ColorNuevo.startswith('#') and len(ColorNuevo)==7:
+        try:
+            int(ColorNuevo,16) # Comprueba que el color se pueda pasar a un entero de base 16, es decir, hexadecimal.
+            if len(ColorNuevo)==6:
+                ColoresConfigurables[variableColor] = ColorNuevo
+        except:
+            print("Color no valido")
+
+        if len(ColorNuevo)==6:
+            ColorNuevo = f"#{ColorNuevo}"
             ColoresConfigurables[variableColor] = ColorNuevo
     BotonColor = ctk.CTkButton(master,text=BotonesModularesColor[variableColor],command=FuncionBoton,font=("Roboto",14),width=250)
     BotonColor.pack(fill='x',pady=5,padx=5)
@@ -164,18 +183,27 @@ def ColorPopUp():
     BotonModular(ConfiColorScroll,"graficaFondo")
     BotonModular(ConfiColorScroll,"colorLTemp")
     BotonModular(ConfiColorScroll,"colorLHum")
+    BotonModular(ConfiColorScroll,"colorDHTBoton")
+    BotonModular(ConfiColorScroll,"colorUSOBoton")
 
 # Funciones botones principales
-
-def IniciarClick ():
+def DHTStarStop():
+    global DHTStatus
     if serOpen:
-        ser.write("iTH\n".encode('utf-8')) #enviamos el mensaje de iniciar
-def PararClick ():
-    if serOpen:
-        ser.write("pTH\n".encode('utf-8')) #enviamos el mensaje de parar
-def ReanudarClick ():
-    if serOpen:
-        ser.write("rTH\n".encode('utf-8')) #enviamos el mensaje de reanudar
+        if not DHTStatus:
+            ser.write("2:i\n".encode('utf-8')) #enviamos el mensaje de iniciar
+            DHTStatus = True
+        else:
+            ser.write("2:p\n".encode('utf-8')) #enviamos el mensaje de iniciar
+            DHTStatus = False
+def DHTSendInterval():
+    DialogoIntervaloDHT = ctk.CTkInputDialog(text="Introduce intervalo de envío de 2000 a 10000 ms",title="Intervalo nuevo")
+    try:
+        IntervaloNuevo = int(DialogoIntervaloDHT.get_input())
+        if IntervaloNuevo > 2000 and IntervaloNuevo < 10000:
+            ser.write(f"2:{IntervaloNuevo}".encode('utf-8'))
+    except:
+        print("Intervalo invalido")
 
 # Funcion para crear indicadores de sensores y el heartbeat de manera modular asi no hay que escribirlo muchas veces
 def AgregarIndicador(nombre_texto):
@@ -223,8 +251,7 @@ MarcoArriba.grid(row=0,column=0,sticky="nsew")
 tituloLabel = ctk.CTkLabel(MarcoArriba, text="Sistema satelital",font=("Roboto",22))
 tituloLabel.pack(expand=True)
 # Boton colores
-ColorPopUpBoton = ctk.CTkButton(MarcoArriba,text="⚙️",command=ColorPopUp,font=("Roboto",28),width=40, 
-    height=40,)
+ColorPopUpBoton = ctk.CTkButton(MarcoArriba,text="⚙️",command=ColorPopUp,font=("Roboto",28),width=40,height=40,)
 ColorPopUpBoton.place(relx=1.0,rely=0.5,anchor="e",x=-10)
 
 #Marco central
@@ -255,29 +282,39 @@ frame_botones = ctk.CTkFrame(window)
 frame_botones.grid(row=2,column=0,padx=20,pady=10,sticky="nsew")
 frame_botones.rowconfigure(0,weight=0)
 frame_botones.rowconfigure(1,weight=1)
-frame_botones.columnconfigure(0,weight=1)
-frame_botones.columnconfigure(1,weight=1)
-frame_botones.columnconfigure(2,weight=1)
-titulobotones = ctk.CTkLabel(frame_botones,text="Controles sensor DHT",font=("Roboto",15),anchor="w")
-titulobotones.grid(row=0,column=0,columnspan=3,sticky="ew",padx=15,pady=(8,0))
+for i in range(0,3):
+    frame_botones.columnconfigure(i,weight=1)
+
+titulobotonDHT = ctk.CTkLabel(frame_botones,text="Control sensor DHT",font=("Roboto",15),anchor="w")
+titulobotonDHT.grid(row=0,column=0,columnspan=3,sticky="ew",padx=15,pady=(8,0))
+titulobotonUS = ctk.CTkLabel(frame_botones,text="Control sensor de Ultrasonido",font=("Roboto",15),anchor="w")
+titulobotonUS.grid(row=0,column=2,columnspan=3,sticky="ew",padx=15,pady=(8,0))
+#titulobotonGPS = ctk.CTkLabel(frame_botones,text="Control calculo Media HT",font=("Roboto",15),anchor="w")
+#titulobotonGPS.grid(row=0,column=3,columnspan=3,sticky="ew",padx=15,pady=(8,0))
 
 #Botones Marco Superior
-InicioBoton = ctk.CTkButton(frame_botones,text="Iniciar",command=IniciarClick, font=("Roboto",18),fg_color="pale green",text_color="black",)
-InicioBoton.grid(row=1,column=0,padx=5,pady=5,sticky="nsew")
-PararBoton = ctk.CTkButton(frame_botones,text="Parar",command=PararClick, font=("Roboto",18),fg_color="tomato",text_color="black",)
-PararBoton.grid(row=1,column=1,padx=5,pady=5,sticky="nsew")
-ReanudarBoton = ctk.CTkButton(frame_botones,text="Reanudar",command=ReanudarClick, font=("Roboto",18),fg_color="goldenrod1",text_color="black",)
-ReanudarBoton.grid(row=1,column=2,padx=5,pady=5,sticky="nsew")
+InicioBotonDHT = ctk.CTkButton(frame_botones,text="⏯️",command=DHTStarStop,font=("Roboto",40),fg_color=ColoresConfigurables["colorDHTBoton"],text_color="black",)
+InicioBotonDHT.grid(row=1,column=0,padx=5,pady=5,sticky="nsew")
+DHTSendInterval = ctk.CTkButton(frame_botones,text="⚙️",command=DHTSendInterval,font=("Roboto",40))
+DHTSendInterval.grid(row=1,column=1,padx=5,pady=5,sticky="nsew")
+InicioBotonUSO = ctk.CTkButton(frame_botones,text="⏯️",command=DHTStarStop,font=("Roboto",40),fg_color=ColoresConfigurables["colorUSOBoton"],text_color="black",)
+InicioBotonUSO.grid(row=1,column=2,padx=5,pady=5,sticky="nsew")
+USOSendInterval = ctk.CTkButton(frame_botones,text="⚙️",command=DHTStarStop,font=("Roboto",40))
+USOSendInterval.grid(row=1,column=3,padx=5,pady=5,sticky="nsew")
+
 
 #Marco inferior de los botones
 frameInf_botones = ctk.CTkFrame(window)
 frameInf_botones.grid(row=3,column=0,padx=20,pady=10,sticky="nsew")
 frameInf_botones.rowconfigure(0,weight=0)
 frameInf_botones.columnconfigure(0,weight=1)
+frameInf_botones.columnconfigure(1,weight=1)
 
 #Botones marco inferior
 AbrirSerialBoton = ctk.CTkButton(frameInf_botones,text="Abrir Puerto serie",command=AbrirSerial, font=("Roboto",18))
 AbrirSerialBoton.grid(row=0,column=0,padx=5,pady=5,sticky="nsew")
+AbrirSerialBoton = ctk.CTkButton(frameInf_botones,text="Cerrar Puerto serie",command=CerrarSerial, font=("Roboto",18))
+AbrirSerialBoton.grid(row=0,column=1,padx=5,pady=5,sticky="nsew")
 
 window.after(100,RefreshGUI) #llama a la funcion que hace que el grafico y las alarmas tengan la nueva informacion
 window.mainloop()

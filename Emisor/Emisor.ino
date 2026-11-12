@@ -2,7 +2,7 @@
 bool sendTH = false;
 bool errorTH = false;
 
-const long intervalTH=2000;
+long intervalTH=2000;
 const long intervalHeartbeat = 3000;
 const long THerrorTimeout = 5000;
 const long SendErrorTHInterval = 1000;
@@ -44,13 +44,23 @@ void loop() {
 }
 
 void SatComm(unsigned long Now){
-        char GroundCMD = mySerial.read();
-        // Activa el envío de datos si recibe 'i' (Inicio)
-        if(GroundCMD == 'i'){
+        String GroundCMD = mySerial.readStringUntil('\n');
+        GroundCMD.trim();
+        String ID = GroundCMD.substring(0,2);
+        GroundCMD.remove(0,2);
+        if (ID == "2:"){
+                DHTCMDController(GroundCMD);
+        }
+}
+void DHTCMDController(String GroundCMD){
+        if(GroundCMD == "i"){
                 sendTH = true;
                 lastValidTH = Now; //Arranca la ventana de 5s de timeout del DHT
-        } else if (GroundCMD == 'p'){ // Desactiva el envío de datos si recibe 'p' (Parar)
+        } else if (GroundCMD == "p"){ // Desactiva el envío de datos si recibe 'p' (Parar)
                 sendTH = false;
+        } else {
+                intervalTH = GroundCMD.toInt();
+                //intervalTH = NewInterval;
         }
 }
 void Heartbeat(unsigned long Now){
