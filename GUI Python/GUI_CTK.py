@@ -22,6 +22,7 @@ ColoresConfigurables = {
     "graficaFondo":"#57636E",
     "colorLTemp": "#C72020",
     "colorLHum": "#2C2CAD",
+    "colorLMedia": "#E67E22",
     "colorDHTBoton": "#64BF64",
     "colorUSOBoton": "#55E9E7"
 }
@@ -31,6 +32,7 @@ BotonesModularesColor = {
     "graficaFondo":"Color del fondo de la grafica",
     "colorLTemp": "Color de la linea de temepratura",
     "colorLHum": "Color de la linea de humedad",
+    "colorLMedia": "Color de la linea de media temp.",
     "colorDHTBoton": "Color del boton DHT",
     "colorUSOBoton": "Color del boton Ultrasonido"
 }
@@ -94,6 +96,20 @@ def SensorDHT(Datos):
     if len(datosTemp) > puntosMax:
         datosTemp.pop(0) #elimina el dato mas antiguo
         datosHum.pop(0) 
+    if calcular == "python":
+            CalculoDatosTemp()
+        
+#para recibir la media calculada desde el satelite
+def RecibirMediaSatelite(valorStr):
+    global datosMediaTemp
+    try:
+        mediaSat = float(valorStr)
+        datosMediaTemp.append(mediaSat)
+        if len(datosMediaTemp) > puntosMax:
+            datosMediaTemp.pop(0)
+        AlarmaMediaTemp(mediaSat)
+    except ValueError:
+        pass
 
 def LeerDatos ():
     global ErrorSensorDHT
@@ -108,9 +124,12 @@ def LeerDatos ():
                     HeartbeatIndicator()
                 elif (id == 2):
                     SensorDHT(Datos)
+                elif (id == 5):
+                    RecibirMediaSatelite(Datos)
         except Exception as e:
             print(f"Error: {e}")
             time.sleep(0.1) #pausa
+            
 def AlarmaMediaTemp(media_actual): #alarma por si la media supera el limite
     global contadorMediasAltas, alarmaLimiteMediaTemp, limiteTempMedia
     if media_actual > limiteTempMedia:
@@ -143,6 +162,10 @@ def ActuGraf():
     ax.set_facecolor(ColoresConfigurables["graficaFondo"])
     ax.plot(range(len(datosTemp)),datosTemp,color=ColoresConfigurables["colorLTemp"],label="Temperatura") #dibuja Temperatura
     ax.plot(range(len(datosHum)),datosHum,color=ColoresConfigurables["colorLHum"],label="Humedad") #dibuja Humedad
+    #linea temperatura media en la grafica
+    if len(datosMediaTemp) > 0:
+        ax.plot(range(len(datosMediaTemp)), datosMediaTemp, color=ColoresConfigurables["colorLMedia"], label="Media Temp (10)")
+    
     ax.legend()
     ColorBorde = ColoresConfigurables["graficaBordes"]
     ax.set_title("Datos Temperatura y humedad",color=ColorBorde)
@@ -227,6 +250,7 @@ def ColorPopUp():
     BotonModular(ConfiColorScroll,"graficaFondo")
     BotonModular(ConfiColorScroll,"colorLTemp")
     BotonModular(ConfiColorScroll,"colorLHum")
+    BotonModular(ConfiColorScroll, "colorLMedia")
     BotonModular(ConfiColorScroll,"colorDHTBoton")
     BotonModular(ConfiColorScroll,"colorUSOBoton")
 
@@ -276,12 +300,14 @@ def AgregarIndicador(nombre_texto):
 def SeleccionarPython():
     global calcular
     calcular = "python"
+    datosMediaTemp.clear()
     if serOpen:
         ser.write("4:0\n".encode('utf-8'))
 
 def SeleccionarSatelite():
     global calcular
     calcular = "satelite"
+    datosMediaTemp.clear()
     if serOpen:
         ser.write("4:1\n".encode('utf-8'))
 
@@ -289,6 +315,8 @@ def actualizarLimite(event=None):
     global limiteTempMedia
     try:
         limiteTempMedia = float(entryLimiteTemp.get())
+        if serOpen and calcular == "satelite": #cambiar el nuevo limite de temperatura en el arduino satelite
+            ser.write(f"3:{limiteTempMedia}\n".encode('utf-8'))
     except ValueError:
         pass
 
