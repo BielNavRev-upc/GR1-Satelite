@@ -26,20 +26,12 @@ unsigned long lastValidTH = 0;
 unsigned long Now;
 
 float ultimos10Temp[10];
+float limiteTempMedia;
 int indiceTemp = 0;
 int totalTemperaturas = 0;
 
 int contadorMediasAltas = 0;
 bool alarmaMediaActiva = false;
-
-#include <SoftwareSerial.h>
-#include <DHT.h>
-// Definición de pines y tipo para el sensor DHT11
-#define DHTPIN 2
-#define DHTTYPE DHT11
-// Instancia del sensor DHT (en el pin 2)
-DHT dht(DHTPIN, DHTTYPE);
-SoftwareSerial mySerial(10, 11); //// Configuración de puerto serie; RX, TX
 
 void setup() {
         // Inicializa el puerto serie por software
@@ -48,8 +40,6 @@ void setup() {
         Serial.begin(9600);
         // Inicialización del sensor
         dht.begin();
-        pinMode(RELE_PIN, OUTPUT);
-        digitalWrite(RELE_PIN, LOW);
 
 }
 
@@ -64,12 +54,31 @@ void loop() {
         }
 }
 
-void SatComm(unsigned long Now){
 void SatComm(unsigned long Now) {
     if (mySerial.available() > 0) {
         String comando = mySerial.readStringUntil('\n');
         comando.trim(); 
-        
+        String ID = comando.substring(0,2);
+        comando.remove(0,2);
+        if(ID="2:"){
+            if (comando == "i"){ //Si recibe de la interfaz 'i' (Iniciar) o 'r' (Reanudar), envía una "i" al emisor
+                sendTH = true;
+            } else if (comando == "p"){ //Si recibe de la interfaz 'p' (Parar), envía una "p" al emisor
+                sendTH = false;
+            }
+        }
+        if(ID="4:"){
+            if (comando == "1"){ //Si recibe de la interfaz 'i' (Iniciar) o 'r' (Reanudar), envía una "i" al emisor
+                calcularEnSatelite = true;
+            } else if (comando == "0"){ //Si recibe de la interfaz 'p' (Parar), envía una "p" al emisor
+                calcularEnSatelite = false;
+            }
+        }
+        //limiteTempMedia
+        if(ID="3:"){
+            limiteTempMedia = comando.toFloat();
+        }
+        /*
         if (comando.length() > 0) {
             int fin = comando.indexOf(':', 0);
             if (fin != -1) {
@@ -100,19 +109,15 @@ void SatComm(unsigned long Now) {
                 }
             } else {
                 // COMANDOS SIMPLES DE TEXTO DIRECTO
-                if (comando == "iTH" || comando == "i") {
+                if (comando == "i") {
                     sendTH = true;
-                    lastValidTH = Now; 
-                } else if (comando == "pTH" || comando == "p") {
+                } else if (comando == "p") {
                     sendTH = false;
-                } else if (comando == "rTH") {
-                    sendTH = true;
                 }
             }
-        }
+        }*/
     }
 }
-
 
 void Heartbeat(unsigned long Now){
         mySerial.println("1:");
@@ -135,8 +140,8 @@ void THControl(unsigned long Now){
         }
 }
 
-void ProcesarMediaSatelite(float nuevaTemp) {
-    ultimos10Temp[indiceTemp] = nuevaTemp;
+void ProcesarMediaSatelite(float t) {
+    ultimos10Temp[indiceTemp] = t;
     indiceTemp = (indiceTemp + 1) % 10;
     if (totalTemperaturas < 10) {
         totalTemperaturas++;
@@ -157,12 +162,11 @@ void ProcesarMediaSatelite(float nuevaTemp) {
             contadorMediasAltas++;
             if (contadorMediasAltas >= 3) {
                 alarmaMediaActiva = true;
-                digitalWrite(RELE_PIN, HIGH); //activa sistema refrigeracion
+
             }
         } else {
             contadorMediasAltas = 0;
             alarmaMediaActiva = false;
-            digitalWrite(RELE_PIN, LOW); //desactiva sistema refrigeracion
         }
     }
 }

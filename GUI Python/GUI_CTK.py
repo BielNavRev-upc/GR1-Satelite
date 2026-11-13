@@ -13,7 +13,7 @@ DHTStatus = False
 ErrorSensorDHT = False
 ser = None
 serOpen = False
-serialPort = "/dev/ttyACM0"
+serialPort = "COM5"
 tituloMCentral = "Grafica TH"
 # Customización
 # Diccionario de colores customizables
@@ -100,10 +100,10 @@ def SensorDHT(Datos):
             CalculoDatosTemp()
         
 #para recibir la media calculada desde el satelite
-def RecibirMediaSatelite(valorStr):
+def RecibirMediaSatelite(Datos):
     global datosMediaTemp
     try:
-        mediaSat = float(valorStr)
+        mediaSat = float(Datos)
         datosMediaTemp.append(mediaSat)
         if len(datosMediaTemp) > puntosMax:
             datosMediaTemp.pop(0)
@@ -208,7 +208,7 @@ def RefreshGUI():
     Indicadores["Sensor DHT"].configure(fg_color=colorDHT)
     Indicadores["Alarma Media Temp"].configure(fg_color=colorAlarmaMediaTemp)
     InicioBotonDHT.configure(fg_color=ColoresConfigurables["colorDHTBoton"])
-    InicioBotonUSO.configure(fg_color=ColoresConfigurables["colorUSOBoton"])
+    #InicioBotonUSO.configure(fg_color=ColoresConfigurables["colorUSOBoton"])
     window.after(100, RefreshGUI)
 
 # Creación de Botones de cambio de color modulares
@@ -386,13 +386,8 @@ titulobotones = ctk.CTkLabel(frame_botones,text="Controles sensor DHT",font=("Ro
 titulobotones.grid(row=0,column=0,columnspan=3,sticky="ew",padx=15,pady=(8,0))
 
 #Botones Marco Superior
-InicioBoton = ctk.CTkButton(frame_botones,text="Iniciar",command=DHTStarStop, font=("Roboto",18),fg_color="pale green",text_color="black",)
-InicioBoton.grid(row=1,column=0,padx=5,pady=5,sticky="nsew")
-PararBoton = ctk.CTkButton(frame_botones,text="Parar",command=DHTStarStop, font=("Roboto",18),fg_color="tomato",text_color="black",)
-PararBoton.grid(row=1,column=1,padx=5,pady=5,sticky="nsew")
-ReanudarBoton = ctk.CTkButton(frame_botones,text="Reanudar",command=ReanudarClick, font=("Roboto",18),fg_color="goldenrod1",text_color="black",)
-ReanudarBoton.grid(row=1,column=2,padx=5,pady=5,sticky="nsew")
-
+InicioBotonDHT = ctk.CTkButton(frame_botones,text="Iniciar",command=DHTStarStop, font=("Roboto",18),fg_color=ColoresConfigurables["colorDHTBoton"],text_color="black",)
+InicioBotonDHT.grid(row=1,column=0,padx=5,pady=5,sticky="nsew")
 #Marco inferior de los botones
 frameInf_botones = ctk.CTkFrame(window)
 frameInf_botones.grid(row=3,column=0,padx=20,pady=10,sticky="nsew")

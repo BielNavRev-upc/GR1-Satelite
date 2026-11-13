@@ -60,6 +60,14 @@ void GroundCMDControl(){
          mySerial.println(GroundCMD);
       }
    }
+   if(ID == "3:"){
+      mySerial.print(ID);
+      mySerial.println(GroundCMD);
+   }
+   if(ID == "4:"){
+      mySerial.print(ID);
+      mySerial.println(GroundCMD);
+   }
 }
 void SatFeedControl(String ID,String satFeed,unsigned long Now){ //Controla los datos (el feed) que llega del satelite 
    if(ID == "1:"){
@@ -72,6 +80,10 @@ void SatFeedControl(String ID,String satFeed,unsigned long Now){ //Controla los 
       Serial.print(ID);
       Serial.println(satFeed);//muestra los datos recibidos
       lastValidTH = Now;
+   }
+   if((ID == "5:") && SendTH){
+      Serial.print(ID);
+      Serial.println(satFeed);//muestra los datos recibidos
    }
 }
 void ErrorTHCheck(unsigned long Now){
