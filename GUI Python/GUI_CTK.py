@@ -44,6 +44,14 @@ ultimoHB = 0
 # Diccionario de indicadores y alarmas
 Indicadores = {}
 
+#media temperatura
+datosMediaTemp = []
+
+calcular = "python"
+limiteTempMedia = 30.0
+alarmaLimiteMediaTemp = False
+contadorMediasAltas = 0
+
 #Gestión del puerto serie
 def AbrirSerial():
     global ser, serOpen
@@ -58,6 +66,7 @@ def CerrarSerial():
     global ser, serOpen
     if serOpen:
         ser.close()
+        serOpen = False
 
 #Grafica TH
 Graf = Figure(figsize=(5,4),dpi=100)
@@ -102,7 +111,31 @@ def LeerDatos ():
         except Exception as e:
             print(f"Error: {e}")
             time.sleep(0.1) #pausa
+def AlarmaMediaTemp(media_actual): #alarma por si la media supera el limite
+    global contadorMediasAltas, alarmaLimiteMediaTemp, limiteTempMedia
+    if media_actual > limiteTempMedia:
+        contadorMediasAltas += 1
+        if contadorMediasAltas >= 3:
+            alarmaLimiteMediaTemp = True
+    else:
+        contadorMediasAltas = 0
+        alarmaLimiteMediaTemp = False
+def CalculoDatosTemp(): #calcula la media de los 10 ultimos datos de temperatura recibidos
+    global calcular
+    if calcular == "python":
+        if len(datosTemp) >= 10:
+            ultimos_10 = datosTemp[-10:]
+            media_calc = sum(ultimos_10) / 10
+            datosMediaTemp.append(media_calc)
 
+            AlarmaMediaTemp(media_calc)
+    elif calcular == "satelite":
+        pass
+
+def cambiarLimiteTemp(choice): #cambiar el valor del limite de la temperatura media
+    global limiteTempMedia
+    limiteTempMedia = float(choice)
+    
 #Funcion que actualiza los datos de la grafica
 def ActuGraf():
     global datosHum,datosTemp
@@ -131,16 +164,26 @@ def RefreshGUI():
     # Los primeros if buscan si el sensor/heartbeat que queremos cambiar esta en el diccionario donde hemos guardado las referencias a los cuadrados.
     colorHB = "grey"
     colorDHT = "grey"
+    colorAlarmaMediaTemp = "grey"
     if("Heartbeat" in Indicadores):
         if ((time.time() - ultimoHB) < 1.0):
             colorHB = "#4890D3"
     if("Sensor DHT" in Indicadores):
         if ErrorSensorDHT:
             colorDHT = "#EB3D3D"
-    
+    if("Alarma Media Temp" in Indicadores):
+        if alarmaLimiteMediaTemp:
+            colorAlarmaMediaTemp = "#EB3D3D"
+
+    if len(datosMediaTemp) > 0:
+        lblMediaTiempoReal.configure(text=f"Temp. Media Actual: {datosMediaTemp[-1]:.2f} °C")
+    else:
+        lblMediaTiempoReal.configure(text="Temp. Media Actual: Esperando datos...")
+            
     # El .configure busca en el diccionario donde esta guardado lo que qqueremos cambiar, va a el objeto y le cambia el color.
     Indicadores["Heartbeat"].configure(fg_color=colorHB)
     Indicadores["Sensor DHT"].configure(fg_color=colorDHT)
+    Indicadores["Alarma Media Temp"].configure(fg_color=colorAlarmaMediaTemp)
     InicioBotonDHT.configure(fg_color=ColoresConfigurables["colorDHTBoton"])
     InicioBotonUSO.configure(fg_color=ColoresConfigurables["colorUSOBoton"])
     window.after(100, RefreshGUI)
@@ -152,12 +195,13 @@ def BotonModular(master,variableColor):
         global ColoresConfigurables
         DialogoColor = ctk.CTkInputDialog(text="Introduzca un color en formato hexadecimal XXXXXX",title="Color nuevo")
         ColorNuevo = DialogoColor.get_input()
-        try:
-            int(ColorNuevo,16) # Comprueba que el color se pueda pasar a un entero de base 16, es decir, hexadecimal.
-            if len(ColorNuevo)==6:
-                ColoresConfigurables[variableColor] = ColorNuevo
-        except:
-            print("Color no valido")
+        if ColorNuevo:    
+            try:
+                int(ColorNuevo,16) # Comprueba que el color se pueda pasar a un entero de base 16, es decir, hexadecimal.
+                if len(ColorNuevo)==6:
+                    ColoresConfigurables[variableColor] = ColorNuevo
+            except:
+                print("Color no valido")
 
         if len(ColorNuevo)==6:
             ColorNuevo = f"#{ColorNuevo}"
@@ -204,6 +248,11 @@ def DHTSendInterval():
             ser.write(f"2:{IntervaloNuevo}".encode('utf-8'))
     except:
         print("Intervalo invalido")
+def ReanudarClick():
+    global DHTStatus
+    if serOpen:
+        ser.write("2:i\n".encode('utf-8'))
+        DHTStatus = True
 
 # Funcion para crear indicadores de sensores y el heartbeat de manera modular asi no hay que escribirlo muchas veces
 def AgregarIndicador(nombre_texto):
@@ -224,6 +273,25 @@ def AgregarIndicador(nombre_texto):
     # cambiar 
     Indicadores[nombre_texto] = cuadrado
 
+def SeleccionarPython():
+    global calcular
+    calcular = "python"
+    if serOpen:
+        ser.write("4:0\n".encode('utf-8'))
+
+def SeleccionarSatelite():
+    global calcular
+    calcular = "satelite"
+    if serOpen:
+        ser.write("4:1\n".encode('utf-8'))
+
+def actualizarLimite(event=None):
+    global limiteTempMedia
+    try:
+        limiteTempMedia = float(entryLimiteTemp.get())
+    except ValueError:
+        pass
+
 # Try Abrir serial
 AbrirSerial()
 
@@ -237,11 +305,12 @@ threading.Thread(target=LeerDatos, daemon = True).start()
 window = ctk.CTk()
 window.title("ControlSat")
 window.geometry("1920x1080") # Tamaño de la ventana en pixeles
-window.grid_rowconfigure(0,weight=1)
+window.grid_rowconfigure(0,weight=0)
 window.grid_rowconfigure(1,weight=3)
 window.grid_rowconfigure(2,weight=2)
-window.grid_rowconfigure(2,weight=2)
-window.grid_columnconfigure(0,weight=1)
+window.grid_rowconfigure(3,weight=1)
+window.grid_columnconfigure(0,weight=3)
+window.grid_columnconfigure(1,weight=1)
 
 # Configuración parte de Arriba
 # Marco Principal
@@ -265,7 +334,6 @@ tituloGrafica = ctk.CTkLabel(MarcoCentral,text=tituloMCentral,font=("Roboto",15)
 tituloGrafica.grid(row=0,column=1,sticky="ew",padx=15,pady=(8,0))
 tituloAlarmas = ctk.CTkLabel(MarcoCentral,text="Heartbeat y Alarmas",font=("Roboto",15))
 tituloAlarmas.grid(row=0,column=0,sticky="ew",padx=15,pady=(8,0))
-
 # Grafica
 canvas = FigureCanvasTkAgg(Graf,master=MarcoCentral)
 canvas.get_tk_widget().grid(row=1,column=1,columnspan=3,padx=5,pady=(0,5),sticky="nsew")
@@ -276,32 +344,26 @@ ScrollAlarmas.grid(row=1,column=0,padx=5,pady=5,sticky="nsew")
 # Llamar a la funcion que crea alarmas modularmente
 AgregarIndicador("Heartbeat")
 AgregarIndicador("Sensor DHT")
+AgregarIndicador("Alarma Media Temp")
 
 #Marco superior de los botones
 frame_botones = ctk.CTkFrame(window)
-frame_botones.grid(row=2,column=0,padx=20,pady=10,sticky="nsew")
+frame_botones.grid(row=2,column=0, columnspan=2, padx=20,pady=10,sticky="nsew")
 frame_botones.rowconfigure(0,weight=0)
 frame_botones.rowconfigure(1,weight=1)
-for i in range(0,3):
-    frame_botones.columnconfigure(i,weight=1)
-
-titulobotonDHT = ctk.CTkLabel(frame_botones,text="Control sensor DHT",font=("Roboto",15),anchor="w")
-titulobotonDHT.grid(row=0,column=0,columnspan=3,sticky="ew",padx=15,pady=(8,0))
-titulobotonUS = ctk.CTkLabel(frame_botones,text="Control sensor de Ultrasonido",font=("Roboto",15),anchor="w")
-titulobotonUS.grid(row=0,column=2,columnspan=3,sticky="ew",padx=15,pady=(8,0))
-#titulobotonGPS = ctk.CTkLabel(frame_botones,text="Control calculo Media HT",font=("Roboto",15),anchor="w")
-#titulobotonGPS.grid(row=0,column=3,columnspan=3,sticky="ew",padx=15,pady=(8,0))
+frame_botones.columnconfigure(0,weight=1)
+frame_botones.columnconfigure(1,weight=1)
+frame_botones.columnconfigure(2,weight=1)
+titulobotones = ctk.CTkLabel(frame_botones,text="Controles sensor DHT",font=("Roboto",15),anchor="w")
+titulobotones.grid(row=0,column=0,columnspan=3,sticky="ew",padx=15,pady=(8,0))
 
 #Botones Marco Superior
-InicioBotonDHT = ctk.CTkButton(frame_botones,text="⏯️",command=DHTStarStop,font=("Roboto",40),fg_color=ColoresConfigurables["colorDHTBoton"],text_color="black",)
-InicioBotonDHT.grid(row=1,column=0,padx=5,pady=5,sticky="nsew")
-DHTSendInterval = ctk.CTkButton(frame_botones,text="⚙️",command=DHTSendInterval,font=("Roboto",40))
-DHTSendInterval.grid(row=1,column=1,padx=5,pady=5,sticky="nsew")
-InicioBotonUSO = ctk.CTkButton(frame_botones,text="⏯️",command=DHTStarStop,font=("Roboto",40),fg_color=ColoresConfigurables["colorUSOBoton"],text_color="black",)
-InicioBotonUSO.grid(row=1,column=2,padx=5,pady=5,sticky="nsew")
-USOSendInterval = ctk.CTkButton(frame_botones,text="⚙️",command=DHTStarStop,font=("Roboto",40))
-USOSendInterval.grid(row=1,column=3,padx=5,pady=5,sticky="nsew")
-
+InicioBoton = ctk.CTkButton(frame_botones,text="Iniciar",command=DHTStarStop, font=("Roboto",18),fg_color="pale green",text_color="black",)
+InicioBoton.grid(row=1,column=0,padx=5,pady=5,sticky="nsew")
+PararBoton = ctk.CTkButton(frame_botones,text="Parar",command=DHTStarStop, font=("Roboto",18),fg_color="tomato",text_color="black",)
+PararBoton.grid(row=1,column=1,padx=5,pady=5,sticky="nsew")
+ReanudarBoton = ctk.CTkButton(frame_botones,text="Reanudar",command=ReanudarClick, font=("Roboto",18),fg_color="goldenrod1",text_color="black",)
+ReanudarBoton.grid(row=1,column=2,padx=5,pady=5,sticky="nsew")
 
 #Marco inferior de los botones
 frameInf_botones = ctk.CTkFrame(window)
@@ -313,8 +375,40 @@ frameInf_botones.columnconfigure(1,weight=1)
 #Botones marco inferior
 AbrirSerialBoton = ctk.CTkButton(frameInf_botones,text="Abrir Puerto serie",command=AbrirSerial, font=("Roboto",18))
 AbrirSerialBoton.grid(row=0,column=0,padx=5,pady=5,sticky="nsew")
-AbrirSerialBoton = ctk.CTkButton(frameInf_botones,text="Cerrar Puerto serie",command=CerrarSerial, font=("Roboto",18))
-AbrirSerialBoton.grid(row=0,column=1,padx=5,pady=5,sticky="nsew")
+ColorPopUpBoton = ctk.CTkButton(frameInf_botones,text="Abrir config de colores",command=ColorPopUp, font=("Roboto",18))
+ColorPopUpBoton.grid(row=0,column=1,padx=5,pady=5,sticky="nsew")
+
+#columna con valores temperatura Media:
+frameDer_temp = ctk.CTkFrame(window)
+frameDer_temp.grid(row=1, column=1, padx=5, pady=5, sticky="nsew")
+frameDer_temp.rowconfigure(0, weight=0)
+frameDer_temp.columnconfigure(0, weight=1)
+
+titulotemp = ctk.CTkLabel(frameDer_temp, text="Configuración Media de Temp", font=("Roboto", 15))
+titulotemp.pack(pady=(10, 15))
+
+lblMetodoCalc = ctk.CTkLabel(frameDer_temp, text="Método de cálculo:", font=("Roboto", 14))
+lblMetodoCalc.pack(pady=5)
+
+
+boton_Python = ctk.CTkButton(frameDer_temp, text="Calcular en Python", command=SeleccionarPython, font=("Roboto", 16), fg_color="#2980B9", height=45)
+boton_Python.pack(fill="x", padx=20, pady=8)
+
+boton_Satelite = ctk.CTkButton(frameDer_temp, text="Calcular en Satélite", command=SeleccionarSatelite, font=("Roboto", 16), fg_color="#8E44AD", height=45)
+boton_Satelite.pack(fill="x", padx=20, pady=8)
+
+lblLimiteTexto = ctk.CTkLabel(frameDer_temp, text="Límite Temp Media:", font=("Roboto", 14))
+lblLimiteTexto.pack(pady=(20, 5))
+
+entryLimiteTemp = ctk.CTkEntry(frameDer_temp, font=("Roboto", 14))
+entryLimiteTemp.insert(0, str(limiteTempMedia))
+entryLimiteTemp.pack(fill="x", padx=20, pady=5)
+
+# Vincular el evento de escritura o presionar Enter para actualizar el valor automáticamente
+entryLimiteTemp.bind("<KeyRelease>", actualizarLimite)
+
+lblMediaTiempoReal = ctk.CTkLabel(frameDer_temp, text="Temp. Media Actual: Esperando datos...", font=("Roboto", 14))
+lblMediaTiempoReal.pack(pady=5)
 
 window.after(100,RefreshGUI) #llama a la funcion que hace que el grafico y las alarmas tengan la nueva informacion
 window.mainloop()
