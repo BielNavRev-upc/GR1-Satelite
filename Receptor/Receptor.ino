@@ -3,16 +3,19 @@
 const unsigned long heartbeatLEDInterval = 1000;
 const unsigned long SendErrorTHInterval = 750;
 const unsigned long THErrorTimeout = 5000;
+const unsigned long intervalRadar = 30;
 const int heartbeatLED = 7;
 const int ErrorTHLED = 8;
 
 bool heartbeat = false;
 bool SendTH = false;
+bool actRadar = false;
 
 unsigned long lastHeartbeatTurnOFF = 0;
 unsigned long lastErrorTHRec = 0;
 unsigned long lastValidTH = 0;
 unsigned long lastErrorTH = 0;
+unsigned long lastRadar = 0;
 
 // Configura los pines digitales 10 y 11
 SoftwareSerial mySerial(10, 11); // RX, TX (azul, naranja)
@@ -68,6 +71,19 @@ void GroundCMDControl(){
       mySerial.print(ID);
       mySerial.println(GroundCMD);
    }
+   
+   if (ID == "6:"){
+      if (GroundCMD == "i"){ //Si recibe de la interfaz 'i' (Iniciar) o 'r' (Reanudar), envía una "i" al emisor
+         mySerial.println("6:i");
+         actRadar = true;
+      } else if (GroundCMD == "p"){ //Si recibe de la interfaz 'p' (Parar), envía una "p" al emisor
+         mySerial.println("6:p");
+         actRadar = false;
+      } else{
+         mySerial.print(ID);
+         mySerial.println(GroundCMD);
+      }
+   }
 }
 void SatFeedControl(String ID,String satFeed,unsigned long Now){ //Controla los datos (el feed) que llega del satelite 
    if(ID == "1:"){
@@ -84,6 +100,11 @@ void SatFeedControl(String ID,String satFeed,unsigned long Now){ //Controla los 
    if((ID == "5:") && SendTH){
       Serial.print(ID);
       Serial.println(satFeed);//muestra los datos recibidos
+   }
+   if((ID == "6:") && actRadar){
+      Serial.print(ID);
+      Serial.println(satFeed);//muestra los datos recibidos
+      lastRadar = Now;
    }
 }
 void ErrorTHCheck(unsigned long Now){

@@ -1,9 +1,9 @@
 #include <SoftwareSerial.h>
 #include <DHT.h>
+#include<Servo.h>
 
 #define DHTPIN 2
 #define DHTTYPE DHT11
-#define RELE_PIN 7
 
 DHT dht(DHTPIN, DHTTYPE);
 SoftwareSerial mySerial(10, 11);
@@ -12,6 +12,7 @@ SoftwareSerial mySerial(10, 11);
 bool sendTH = false;
 bool errorTH = false;
 bool calcularEnSatelite = false;
+bool actRadar = false;
 
 long intervalTH=2000;
 const long intervalHeartbeat = 3000;
@@ -24,14 +25,29 @@ unsigned long lastSentErrorTH = 0;
 unsigned long lastErrorTH = 0;
 unsigned long lastValidTH = 0;
 unsigned long Now;
+unsigned long lastRadar = 0;
+
+const unsigned long intervalRadar = 30; // 30ms entre señales
 
 float ultimos10Temp[10];
 float limiteTempMedia;
 int indiceTemp = 0;
 int totalTemperaturas = 0;
 
+int currentAngle = 0;
+int stepDirection = 1;
+
+long duracion;
+float distancia;
+
+Servo myServo;
+
 int contadorMediasAltas = 0;
 bool alarmaMediaActiva = false;
+
+const int trigPin = 6;
+const int echoPin = 5;
+const int servoPin = 9;
 
 void setup() {
         // Inicializa el puerto serie por software
@@ -40,6 +56,12 @@ void setup() {
         Serial.begin(9600);
         // Inicialización del sensor
         dht.begin();
+  
+        pinMode(trigPin, OUTPUT);
+        pinMode(echoPin, INPUT);
+        
+        myServo.attach(servoPin);
+        myServo.write(currentAngle);
 
 }
 
@@ -51,6 +73,9 @@ void loop() {
         }
         if(sendTH && (Now-lastTH >= intervalTH)){
                 THControl(Now);
+        }
+        if(actRadar && (Now-lastRadar >= intervalRadar)){
+                Radar(Now);
         }
 }
 
@@ -116,6 +141,13 @@ void SatComm(unsigned long Now) {
                 }
             }
         }*/
+        if(ID="6:"){
+            if (comando == "i"){ //Si recibe de la interfaz 'i' (Iniciar) o 'r' (Reanudar), envía una "i" al emisor
+                actRadar = true;
+            } else if (comando == "p"){ //Si recibe de la interfaz 'p' (Parar), envía una "p" al emisor
+                actRadar = false;
+            }
+        }
     }
 }
 
@@ -169,4 +201,34 @@ void ProcesarMediaSatelite(float t) {
             alarmaMediaActiva = false;
         }
     }
+}
+
+void Radar(unsigned long Now){
+    lastRadar = Now;
+    currentAngle += stepDirection;
+    if(currentAngle>=180){
+        currentAngle = 180;
+        stepDirection = -1;
+    } else if(currentAngle<=0){
+        currentAngle=0;
+        stepDirection = 1;
+    }
+    myServo.write(currentAngle);
+ 
+    // Enviar un pulso de 10 microsegundos al Trigger
+    digitalWrite(trigPin, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(trigPin, LOW);
+
+    // Leer el tiempo que tarda el eco en regresar (en microsegundos)
+    duracion = pulseIn(echoPin, HIGH);
+
+    // Calcular la distancia en cm (velocidad del sonido ~ 343m/s -> 0.0343 cm/us / 2)
+    distancia = duracion * 0.034 / 2;
+
+    // Mostrar el resultado en el monitor serie
+    mySerial.print("6: ");
+    mySerial.print(distancia);
+    mySerial.print(";");
+    mySerial.println(currentAngle);
 }
