@@ -4,17 +4,20 @@ import customtkinter as ctk
 import serial
 import time
 import threading 
+import numpy as np
+from matplotlib.ticker import ScalarFormatter
 
 # Variables globales
 puntosMax = 150
 datosTemp = []
 datosHum = []
+datosRadar=[]
 DHTStatus = False
+HCSR04Status = False
 ErrorSensorDHT = False
 ser = None
 serOpen = False
-serialPort = "COM5"
-tituloMCentral = "Grafica TH"
+serialPort = "/dev/ttyACM0"
 # Customización
 # Diccionario de colores customizables
 ColoresConfigurables = {
@@ -24,7 +27,8 @@ ColoresConfigurables = {
     "colorLHum": "#2C2CAD",
     "colorLMedia": "#E67E22",
     "colorDHTBoton": "#64BF64",
-    "colorUSOBoton": "#55E9E7"
+    "colorUSOBoton": "#55E9E7",
+    "colorRadar": "#56EC49"
 }
 # Diccionario con los titulos de los botones de cambio de color
 BotonesModularesColor = {
@@ -34,7 +38,8 @@ BotonesModularesColor = {
     "colorLHum": "Color de la linea de humedad",
     "colorLMedia": "Color de la linea de media temp.",
     "colorDHTBoton": "Color del boton DHT",
-    "colorUSOBoton": "Color del boton Ultrasonido"
+    "colorUSOBoton": "Color del boton Ultrasonido",
+    "colorRadar": "Color del radar"
 }
 CustomColoresOriginal = ColoresConfigurables.copy() # Si no se usa el copy el python diria que simplemente son la misma direccion de memoria y no nos quedariamos con los colores originales
 ctk.set_appearance_mode("dark")
@@ -75,6 +80,11 @@ GrafDHT = Figure(figsize=(5,4),dpi=100)
 ax = GrafDHT.add_subplot(111)
 GrafDHT.patch.set_facecolor("#242526")
 
+# Grafica RADAR
+GrafRadar = Figure(figsize=(5,4),dpi=130,layout="constrained")
+ax_radar = GrafRadar.add_subplot(111, projection='polar')
+GrafRadar.patch.set_facecolor("#242526")
+
 #Funciones SatComm
 def HeartbeatIndicator():
     global ultimoHB
@@ -111,6 +121,21 @@ def RecibirMediaSatelite(Datos):
     except ValueError:
         pass
 
+def RadarDatos(Datos):
+    global datosRadar
+    try:
+        partes = Datos.split(";")
+        angulo = float(partes[0])
+        dist = float(partes[1])
+        if dist == 0:
+            dist = 0.1
+        datosRadar.append((angulo, dist))
+        
+        if len(datosRadar) > 3:
+            datosRadar.pop(0)
+    except:
+        pass
+
 def LeerDatos ():
     global ErrorSensorDHT
     while serOpen:
@@ -126,6 +151,8 @@ def LeerDatos ():
                     SensorDHT(Datos)
                 elif (id == 5):
                     RecibirMediaSatelite(Datos)
+                elif (id == 6):
+                    RadarDatos(Datos)
         except Exception as e:
             print(f"Error: {e}")
             time.sleep(0.1) #pausa
@@ -178,10 +205,39 @@ def ActuGraf():
     ax.tick_params(axis='x', which='both', length=0, labelbottom=False)
     ax.set_ylim(10, 90)
     GraficaDHT.draw() #actualiza la grafica
+
+def ActuRadar():
+    ax_radar.clear()
+    ax_radar.set_facecolor(ColoresConfigurables["graficaFondo"])
     
+    if len(datosRadar) > 0:
+        # Convert angles to radians for polar plot
+        theta = np.deg2rad([d[0] for d in datosRadar])
+        r = [d[1] for d in datosRadar]
+        ax_radar.plot(theta, r, color=ColoresConfigurables["colorRadar"], linewidth=2)
+
+    ax_radar.set_rscale('log')
+    ax_radar.yaxis.set_major_formatter(ScalarFormatter())
+
+    ax_radar.set_thetalim(0, np.pi) 
+    ax_radar.set_xticks(np.deg2rad([30, 60, 90, 120, 150]))
+    ax_radar.set_yticks([2, 10, 20, 50, 100, 200, 400])
+    
+    ColorBorde = ColoresConfigurables["graficaBordes"]
+    ax_radar.tick_params(axis='x', colors=ColoresConfigurables["colorRadar"], labelsize=9)
+    ax_radar.tick_params(axis='y', colors=ColoresConfigurables["colorRadar"], labelsize=8)
+    ax_radar.spines['polar'].set_color(ColoresConfigurables["colorRadar"])
+
+    ax_radar.set_ylim(1,400)
+
+    GrafRadar.tight_layout()
+    
+    GraficaRadar.draw()
+
 # Funcion que actualiza la GUI
 def RefreshGUI():
-    ActuGraf() ## Funcion que actualiza la grafica
+    ActuGraf() # Funcion que actualiza la grafica
+    ActuRadar()
     # Configuracion cuadrados de las alarmas
     # El cuadrado se ha guardado como un objeto, para cambiar su informacion hay que usar la funcion de ".configure", en este caso cambia el color.
     # Los primeros if buscan si el sensor/heartbeat que queremos cambiar esta en el diccionario donde hemos guardado las referencias a los cuadrados.
@@ -207,7 +263,7 @@ def RefreshGUI():
     Indicadores["Heartbeat"].configure(fg_color=colorHB)
     Indicadores["Sensor DHT"].configure(fg_color=colorDHT)
     Indicadores["Alarma Media Temp"].configure(fg_color=colorAlarmaMediaTemp)
-    InicioBotonDHT.configure(fg_color=ColoresConfigurables["colorDHTBoton"])
+    IniBotonDHT.configure(fg_color=ColoresConfigurables["colorDHTBoton"])
     #InicioBotonUSO.configure(fg_color=ColoresConfigurables["colorUSOBoton"])
     window.after(25, RefreshGUI)
 
@@ -242,6 +298,7 @@ def ColorPopUp():
     def ColorReset():
         global ColoresConfigurables
         ColoresConfigurables = CustomColoresOriginal.copy()
+        RefreshGUI()
     #Boton del Reset
     BotonReset = ctk.CTkButton(ConfiColor, text="Reset de colores",command=ColorReset,font=("Roboto",18),fg_color="#C0392B",hover_color="#962D22")
     BotonReset.pack(pady=15,padx=20,fill='x')
@@ -280,9 +337,25 @@ def DHTConfig():
     try:
         IntervaloNuevo = int(DialogoIntervaloDHT.get_input())
         if IntervaloNuevo > 2000 and IntervaloNuevo < 10000:
-            ser.write(f"2:{IntervaloNuevo}\n".encode('utf-8'))
+            ser.write(f"7:{IntervaloNuevo}\n".encode('utf-8'))
     except:
         print("Intervalo invalido")
+
+def HCSR04Start():
+    global HCSR04Status
+    if not serOpen:
+        print("Puerto serie no abierto")
+        return
+    ser.write("6:i\n".encode('utf-8')) #enviamos el mensaje de iniciar
+    HCSR04Status = True
+
+def HCSR04Stop():
+    global HCSR04Status
+    if not serOpen:
+        print("Puerto serie no abierto")
+        return
+    ser.write("6:p\n".encode('utf-8')) #enviamos el mensaje de iniciar
+    HCSR04Status = False
 
 # Funcion para crear indicadores de sensores y el heartbeat de manera modular asi no hay que escribirlo muchas veces
 def AgregarIndicador(nombre_texto):
@@ -341,7 +414,7 @@ window.title("ControlSat")
 window.geometry("1920x1080") # Tamaño de la ventana en pixeles
 window.grid_rowconfigure(0,weight=0)
 window.grid_rowconfigure(1,weight=0)
-window.grid_rowconfigure(2,weight=2)
+window.grid_rowconfigure(2,weight=1)
 window.grid_rowconfigure(3,weight=0)
 window.grid_columnconfigure(0,weight=1)
 
@@ -376,6 +449,9 @@ TabsMain.tab("Grafica DHT").columnconfigure(0,weight=1)
 TabsMain.tab("Grafica DHT").rowconfigure(0,weight=2)
 TabsMain.tab("Grafica DHT").rowconfigure(1,weight=1)
 
+TabsMain.tab("Grafica HC-SR04").columnconfigure(0,weight=1)
+TabsMain.tab("Grafica HC-SR04").rowconfigure(0,weight=2)
+TabsMain.tab("Grafica HC-SR04").rowconfigure(1,weight=1)
 # Marco de la grafica y de las medias
 MarcoGraficaDHT = ctk.CTkFrame(TabsMain.tab("Grafica DHT"))
 MarcoGraficaDHT.grid(row=0,column=0,sticky="nsew")
@@ -383,9 +459,20 @@ MarcoGraficaDHT.columnconfigure(0,weight=2)
 MarcoGraficaDHT.columnconfigure(1,weight=1)
 MarcoGraficaDHT.rowconfigure(0,weight=1)
 
+# Marco de la grafica y de las medias
+MarcoGraficaHCSR04 = ctk.CTkFrame(TabsMain.tab("Grafica HC-SR04"))
+MarcoGraficaHCSR04.grid(row=0,column=0,sticky="nsew")
+MarcoGraficaHCSR04.columnconfigure(0,weight=1)
+MarcoGraficaHCSR04.rowconfigure(0,weight=2)
+MarcoGraficaHCSR04.rowconfigure(1,weight=1)
+
 # Grafica
 GraficaDHT = FigureCanvasTkAgg(GrafDHT,master=MarcoGraficaDHT)
 GraficaDHT.get_tk_widget().grid(row=0,column=0,padx=5,pady=(0,5),sticky="nsew")
+
+# Grafica
+GraficaRadar = FigureCanvasTkAgg(GrafRadar,master=MarcoGraficaHCSR04)
+GraficaRadar.get_tk_widget().grid(row=0,column=0,padx=5,pady=(0,5),sticky="nsew")
 
 #columna con valores temperatura Media:
 frameDer_temp = ctk.CTkFrame(MarcoGraficaDHT)
@@ -443,10 +530,35 @@ frameInf_botones.rowconfigure(0,weight=0)
 frameInf_botones.columnconfigure(0,weight=1)
 frameInf_botones.columnconfigure(1,weight=1)
 
+#Marco superior de los botones
+frame_botones2 = ctk.CTkFrame(TabsMain.tab("Grafica HC-SR04"))
+frame_botones2.grid(row=1,column=0, columnspan=2, padx=10,pady=10,sticky="nsew")
+frame_botones2.rowconfigure(0,weight=0)
+frame_botones2.rowconfigure(1,weight=1)
+frame_botones2.columnconfigure(0,weight=2)
+frame_botones2.columnconfigure(1,weight=2)
+frame_botones2.columnconfigure(2,weight=1)
+titulobotones2 = ctk.CTkLabel(frame_botones2,text="Controles sensor HCSR04",font=("Roboto",15),anchor="w")
+titulobotones2.grid(row=0,column=0,columnspan=3,sticky="ew",padx=15,pady=(8,0))
+
+#Botones Marco Superior
+IniBotonHCSR04 = ctk.CTkButton(frame_botones2,text="▶️",command=HCSR04Start, font=("Roboto",50),fg_color=ColoresConfigurables["colorDHTBoton"],text_color="black",)
+IniBotonHCSR04.grid(row=1,column=0,padx=5,pady=5,sticky="nsew")
+PararBotonHCSR04 = ctk.CTkButton(frame_botones2,text="⏸️",command=HCSR04Stop, font=("Roboto",50),fg_color=ColoresConfigurables["colorDHTBoton"],text_color="black",)
+PararBotonHCSR04.grid(row=1,column=1,padx=5,pady=5,sticky="nsew")
+BotonConfiHCSR04 = ctk.CTkButton(frame_botones2,text="⚙️",command=DHTConfig, font=("Roboto",50),text_color="black",)
+BotonConfiHCSR04.grid(row=1,column=2,padx=5,pady=5,sticky="nsew")
+#Marco inferior de los botones
+frameInf_botones = ctk.CTkFrame(window)
+frameInf_botones.grid(row=3,column=0,padx=10,pady=10,sticky="nsew")
+frameInf_botones.rowconfigure(0,weight=1)
+frameInf_botones.columnconfigure(0,weight=1)
+frameInf_botones.columnconfigure(1,weight=1)
+
 #Botones marco inferior
 AbrirSerialBoton = ctk.CTkButton(frameInf_botones,text="Abrir Puerto serie",command=AbrirSerial, font=("Roboto",18))
 AbrirSerialBoton.grid(row=0,column=0,padx=5,pady=5,sticky="nsew")
-ColorPopUpBoton = ctk.CTkButton(frameInf_botones,text="Abrir config de colores",command=ColorPopUp, font=("Roboto",18))
+ColorPopUpBoton = ctk.CTkButton(frameInf_botones,text="CerrarSerial",command=CerrarSerial, font=("Roboto",18))
 ColorPopUpBoton.grid(row=0,column=1,padx=5,pady=5,sticky="nsew")
 
 def on_closing():

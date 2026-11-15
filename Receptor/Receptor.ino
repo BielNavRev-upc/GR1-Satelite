@@ -63,11 +63,7 @@ void GroundCMDControl(){
          mySerial.println(GroundCMD);
       }
    }
-   if(ID == "3:"){
-      mySerial.print(ID);
-      mySerial.println(GroundCMD);
-   }
-   if(ID == "4:"){
+   if(ID == "3:" || ID == "4:" || ID == "7:"){
       mySerial.print(ID);
       mySerial.println(GroundCMD);
    }

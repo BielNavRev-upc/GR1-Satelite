@@ -1,89 +1,81 @@
 #include <Servo.h>
 
-// Define pins
-const int trigPin = 9;
-const int echoPin = 10;
-const int servoPin = 11;
+// --- Pin Definitions ---
+const int SERVO_PIN = 3;
+const int TRIG_PIN = 6;
+const int ECHO_PIN = 6;
 
-// Constants
-const unsigned long interval = 30; // 30ms between steps
+// --- Constants for Servo ---
+const int MIN_ANGLE = 0;
+const int MAX_ANGLE = 180;
+const int ANGLE_STEP = 1;
+const int SWEEP_DELAY = 15; // Delay between servo movements in milliseconds
 
-// Variables for timing
-unsigned long previousMillis = 0;
+// --- Constants for Ultrasonic Sensor ---
+// The speed of sound is 343 m/s or 29.1 microseconds per centimeter.
+// The pulseIn() function measures the round trip time.
+// So, the distance in cm is (duration / 2) / 29.1 = duration / 58.2
+const float SOUND_SPEED_FACTOR = 58.2; 
 
-// Variables for Servo and Sensor
-int currentAngle = 0;
-int stepDirection = 1; // 1 for increasing, -1 for decreasing
 Servo myServo;
 
-// Function prototypes
-float getDistance();
-void sendData(int angle);
-
 void setup() {
+  pinMode(TRIG_PIN, OUTPUT);
+  pinMode(ECHO_PIN, INPUT);
+  myServo.attach(SERVO_PIN);
   Serial.begin(9600);
-  
-  pinMode(trigPin, OUTPUT);
-  pinMode(echoPin, INPUT);
-  
-  myServo.attach(servoPin);
-  myServo.write(currentAngle); // Start at 0
-  
-  Serial.println("Angle;Distance(cm)");
 }
 
 void loop() {
-  // Get the current time
-  unsigned long currentMillis = millis();
+  // Sweep from MIN_ANGLE to MAX_ANGLE
+  sweepAndMeasure(MIN_ANGLE, MAX_ANGLE, ANGLE_STEP);
+  
+  // Sweep back from MAX_ANGLE to MIN_ANGLE
+  sweepAndMeasure(MAX_ANGLE, MIN_ANGLE, -ANGLE_STEP);
+}
 
-  // Check if it is time to take a step (every 30ms)
-  if (currentMillis - previousMillis >= interval) {
-    // Save the last time we performed an action
-    previousMillis = currentMillis;
-
-    // 1. Move the Servo
-    currentAngle += stepDirection;
-
-    // 2. Check if we hit the limits (0 or 180) and change direction
-    if (currentAngle >= 180) {
-      currentAngle = 180;
-      stepDirection = -1;
-    } else if (currentAngle <= 0) {
-      currentAngle = 0;
-      stepDirection = 1;
-    }
-
-    myServo.write(currentAngle);
-
-    // 3. Measure distance and send data
-    sendData(currentAngle);
+/**
+ * @brief Sweeps the servo motor and measures the distance at each step.
+ * @param startAngle The starting angle of the sweep.
+ * @param endAngle The ending angle of the sweep.
+ * @param step The increment or decrement for the angle.
+ */
+void sweepAndMeasure(int startAngle, int endAngle, int step) {
+  for (int angle = startAngle; (step > 0) ? (angle <= endAngle) : (angle >= endAngle); angle += step) {
+    myServo.write(angle);
+    delay(SWEEP_DELAY);
+    int distance = calculateDistance();
+    printData(angle, distance);
   }
-
-  // Because there are no delay() calls, the code reaches this point 
-  // thousands of times per second, leaving room for other tasks.
 }
 
-void sendData(int angle) {
-  float dist = getDistance();
-  Serial.print(angle);
-  Serial.print(";");
-  Serial.println(dist);
-}
-
-float getDistance() {
-  digitalWrite(trigPin, LOW);
+/**
+ * @brief Calculates the distance using the ultrasonic sensor.
+ * @return The calculated distance in centimeters.
+ */
+int calculateDistance() {
+  // Trigger the ultrasonic sensor
+  digitalWrite(TRIG_PIN, LOW);
   delayMicroseconds(2);
-  digitalWrite(trigPin, HIGH);
+  digitalWrite(TRIG_PIN, HIGH);
   delayMicroseconds(10);
-  digitalWrite(trigPin, LOW);
+  digitalWrite(TRIG_PIN, LOW);
 
-  // We use a short timeout (25000us) so the sensor doesn't 
-  // block the loop for too long if no object is found.
-  long duration = pulseIn(echoPin, HIGH, 25000); 
-  
-  if (duration == 0) {
-    return 0;
-  }
-  
-  return duration * 0.034 / 2;
+  // Read the echo pulse
+  long duration = pulseIn(ECHO_PIN, HIGH);
+
+  // Calculate the distance in centimeters
+  return static_cast<int>(duration / SOUND_SPEED_FACTOR);
+}
+
+/**
+ * @brief Prints the angle and distance data to the Serial Monitor.
+ * @param angle The current angle of the servo.
+ * @param distance The measured distance.
+ */
+void printData(int angle, int distance) {
+  Serial.print(angle);
+  Serial.print(",");
+  Serial.print(distance);
+  Serial.println(".");
 }
