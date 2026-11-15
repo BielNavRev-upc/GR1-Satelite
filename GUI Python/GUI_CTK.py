@@ -71,9 +71,9 @@ def CerrarSerial():
         serOpen = False
 
 #Grafica TH
-Graf = Figure(figsize=(5,4),dpi=100)
-ax = Graf.add_subplot(111)
-Graf.patch.set_facecolor("#242526")
+GrafDHT = Figure(figsize=(5,4),dpi=100)
+ax = GrafDHT.add_subplot(111)
+GrafDHT.patch.set_facecolor("#242526")
 
 #Funciones SatComm
 def HeartbeatIndicator():
@@ -177,7 +177,7 @@ def ActuGraf():
         spine.set_color(ColorBorde)
     ax.tick_params(axis='x', which='both', length=0, labelbottom=False)
     ax.set_ylim(10, 90)
-    canvas.draw() #actualiza la grafica
+    GraficaDHT.draw() #actualiza la grafica
     
 # Funcion que actualiza la GUI
 def RefreshGUI():
@@ -209,7 +209,7 @@ def RefreshGUI():
     Indicadores["Alarma Media Temp"].configure(fg_color=colorAlarmaMediaTemp)
     InicioBotonDHT.configure(fg_color=ColoresConfigurables["colorDHTBoton"])
     #InicioBotonUSO.configure(fg_color=ColoresConfigurables["colorUSOBoton"])
-    window.after(100, RefreshGUI)
+    window.after(25, RefreshGUI)
 
 # Creación de Botones de cambio de color modulares
 # Funcion modular que crea los botones
@@ -218,6 +218,8 @@ def BotonModular(master,variableColor):
         global ColoresConfigurables
         DialogoColor = ctk.CTkInputDialog(text="Introduzca un color en formato hexadecimal XXXXXX",title="Color nuevo")
         ColorNuevo = DialogoColor.get_input()
+        if not ColorNuevo:
+            return
         if ColorNuevo:    
             try:
                 int(ColorNuevo,16) # Comprueba que el color se pueda pasar a un entero de base 16, es decir, hexadecimal.
@@ -255,34 +257,38 @@ def ColorPopUp():
     BotonModular(ConfiColorScroll,"colorUSOBoton")
 
 # Funciones botones principales
-def DHTStarStop():
+def DHTStart():
     global DHTStatus
-    if serOpen:
-        if not DHTStatus:
-            ser.write("2:i\n".encode('utf-8')) #enviamos el mensaje de iniciar
-            DHTStatus = True
-        else:
-            ser.write("2:p\n".encode('utf-8')) #enviamos el mensaje de iniciar
-            DHTStatus = False
-def DHTSendInterval():
+    if not serOpen:
+        print("Puerto serie no abierto")
+        return
+    ser.write("2:i\n".encode('utf-8')) #enviamos el mensaje de iniciar
+    DHTStatus = True
+
+def DHTStop():
+    global DHTStatus
+    if not serOpen:
+        print("Puerto serie no abierto")
+        return
+    ser.write("2:p\n".encode('utf-8')) #enviamos el mensaje de iniciar
+    DHTStatus = False
+def DHTConfig():
     DialogoIntervaloDHT = ctk.CTkInputDialog(text="Introduce intervalo de envío de 2000 a 10000 ms",title="Intervalo nuevo")
+    if not serOpen:
+        print("Puerto serie no abierto")
+        return
     try:
         IntervaloNuevo = int(DialogoIntervaloDHT.get_input())
         if IntervaloNuevo > 2000 and IntervaloNuevo < 10000:
-            ser.write(f"2:{IntervaloNuevo}".encode('utf-8'))
+            ser.write(f"2:{IntervaloNuevo}\n".encode('utf-8'))
     except:
         print("Intervalo invalido")
-def ReanudarClick():
-    global DHTStatus
-    if serOpen:
-        ser.write("2:i\n".encode('utf-8'))
-        DHTStatus = True
 
 # Funcion para crear indicadores de sensores y el heartbeat de manera modular asi no hay que escribirlo muchas veces
 def AgregarIndicador(nombre_texto):
     # Crear un contenedor para la fila (para que el texto y el cuadrado estén alineados)
     fila = ctk.CTkFrame(ScrollAlarmas, fg_color="transparent")
-    fila.pack(fill="x", padx=10, pady=5)
+    fila.pack(side="left", padx=10, pady=5)
     
     # Etiqueta de texto
     lbl = ctk.CTkLabel(fila, text=nombre_texto, font=("Roboto", 13))
@@ -334,15 +340,14 @@ window = ctk.CTk()
 window.title("ControlSat")
 window.geometry("1920x1080") # Tamaño de la ventana en pixeles
 window.grid_rowconfigure(0,weight=0)
-window.grid_rowconfigure(1,weight=3)
+window.grid_rowconfigure(1,weight=0)
 window.grid_rowconfigure(2,weight=2)
-window.grid_rowconfigure(3,weight=1)
-window.grid_columnconfigure(0,weight=3)
-window.grid_columnconfigure(1,weight=1)
+window.grid_rowconfigure(3,weight=0)
+window.grid_columnconfigure(0,weight=1)
 
 # Configuración parte de Arriba
-# Marco Principal
-MarcoArriba = ctk.CTkFrame(window, bg_color="transparent")
+# Marco Texto
+MarcoArriba = ctk.CTkFrame(window, bg_color="transparent",height=50)
 MarcoArriba.grid(row=0,column=0,sticky="nsew")
 # Configuración del titulo
 tituloLabel = ctk.CTkLabel(MarcoArriba, text="Sistema satelital",font=("Roboto",22))
@@ -351,59 +356,40 @@ tituloLabel.pack(expand=True)
 ColorPopUpBoton = ctk.CTkButton(MarcoArriba,text="⚙️",command=ColorPopUp,font=("Roboto",28),width=40,height=40,)
 ColorPopUpBoton.place(relx=1.0,rely=0.5,anchor="e",x=-10)
 
-#Marco central
-MarcoCentral = ctk.CTkFrame(window)
-MarcoCentral.grid(row=1,column=0,padx=5,pady=5,sticky="nsew")
-MarcoCentral.rowconfigure(0,weight=0)
-MarcoCentral.rowconfigure(1,weight=1)
-MarcoCentral.columnconfigure(0,weight=1)
-MarcoCentral.columnconfigure(1,weight=4)
-tituloGrafica = ctk.CTkLabel(MarcoCentral,text=tituloMCentral,font=("Roboto",15))
-tituloGrafica.grid(row=0,column=1,sticky="ew",padx=15,pady=(8,0))
-tituloAlarmas = ctk.CTkLabel(MarcoCentral,text="Heartbeat y Alarmas",font=("Roboto",15))
-tituloAlarmas.grid(row=0,column=0,sticky="ew",padx=15,pady=(8,0))
-# Grafica
-canvas = FigureCanvasTkAgg(Graf,master=MarcoCentral)
-canvas.get_tk_widget().grid(row=1,column=1,columnspan=3,padx=5,pady=(0,5),sticky="nsew")
-
 #Alarmas
-ScrollAlarmas = ctk.CTkScrollableFrame(MarcoCentral)
+ScrollAlarmas = ctk.CTkScrollableFrame(window,orientation="horizontal",height=40)
 ScrollAlarmas.grid(row=1,column=0,padx=5,pady=5,sticky="nsew")
 # Llamar a la funcion que crea alarmas modularmente
 AgregarIndicador("Heartbeat")
 AgregarIndicador("Sensor DHT")
 AgregarIndicador("Alarma Media Temp")
 
-#Marco superior de los botones
-frame_botones = ctk.CTkFrame(window)
-frame_botones.grid(row=2,column=0, columnspan=2, padx=20,pady=10,sticky="nsew")
-frame_botones.rowconfigure(0,weight=0)
-frame_botones.rowconfigure(1,weight=1)
-frame_botones.columnconfigure(0,weight=1)
-frame_botones.columnconfigure(1,weight=1)
-frame_botones.columnconfigure(2,weight=1)
-titulobotones = ctk.CTkLabel(frame_botones,text="Controles sensor DHT",font=("Roboto",15),anchor="w")
-titulobotones.grid(row=0,column=0,columnspan=3,sticky="ew",padx=15,pady=(8,0))
+# Marco central
+TabsMain = ctk.CTkTabview(window)
+TabsMain.grid(row=2,column=0,padx=5,pady=5,sticky="nsew")
+# Confi de las tabs
+TabsMain.add("Grafica DHT")
+TabsMain.add("Grafica HC-SR04")
+TabsMain.set("Grafica DHT")
 
-#Botones Marco Superior
-InicioBotonDHT = ctk.CTkButton(frame_botones,text="Iniciar",command=DHTStarStop, font=("Roboto",18),fg_color=ColoresConfigurables["colorDHTBoton"],text_color="black",)
-InicioBotonDHT.grid(row=1,column=0,padx=5,pady=5,sticky="nsew")
-#Marco inferior de los botones
-frameInf_botones = ctk.CTkFrame(window)
-frameInf_botones.grid(row=3,column=0,padx=20,pady=10,sticky="nsew")
-frameInf_botones.rowconfigure(0,weight=0)
-frameInf_botones.columnconfigure(0,weight=1)
-frameInf_botones.columnconfigure(1,weight=1)
+TabsMain.tab("Grafica DHT").columnconfigure(0,weight=1)
+TabsMain.tab("Grafica DHT").rowconfigure(0,weight=2)
+TabsMain.tab("Grafica DHT").rowconfigure(1,weight=1)
 
-#Botones marco inferior
-AbrirSerialBoton = ctk.CTkButton(frameInf_botones,text="Abrir Puerto serie",command=AbrirSerial, font=("Roboto",18))
-AbrirSerialBoton.grid(row=0,column=0,padx=5,pady=5,sticky="nsew")
-ColorPopUpBoton = ctk.CTkButton(frameInf_botones,text="Abrir config de colores",command=ColorPopUp, font=("Roboto",18))
-ColorPopUpBoton.grid(row=0,column=1,padx=5,pady=5,sticky="nsew")
+# Marco de la grafica y de las medias
+MarcoGraficaDHT = ctk.CTkFrame(TabsMain.tab("Grafica DHT"))
+MarcoGraficaDHT.grid(row=0,column=0,sticky="nsew")
+MarcoGraficaDHT.columnconfigure(0,weight=2)
+MarcoGraficaDHT.columnconfigure(1,weight=1)
+MarcoGraficaDHT.rowconfigure(0,weight=1)
+
+# Grafica
+GraficaDHT = FigureCanvasTkAgg(GrafDHT,master=MarcoGraficaDHT)
+GraficaDHT.get_tk_widget().grid(row=0,column=0,padx=5,pady=(0,5),sticky="nsew")
 
 #columna con valores temperatura Media:
-frameDer_temp = ctk.CTkFrame(window)
-frameDer_temp.grid(row=1, column=1, padx=5, pady=5, sticky="nsew")
+frameDer_temp = ctk.CTkFrame(MarcoGraficaDHT)
+frameDer_temp.grid(row=0, column=1, padx=5, pady=5, sticky="nsew")
 frameDer_temp.rowconfigure(0, weight=0)
 frameDer_temp.columnconfigure(0, weight=1)
 
@@ -412,7 +398,6 @@ titulotemp.pack(pady=(10, 15))
 
 lblMetodoCalc = ctk.CTkLabel(frameDer_temp, text="Método de cálculo:", font=("Roboto", 14))
 lblMetodoCalc.pack(pady=5)
-
 
 boton_Python = ctk.CTkButton(frameDer_temp, text="Calcular en Python", command=SeleccionarPython, font=("Roboto", 16), fg_color="#2980B9", height=45)
 boton_Python.pack(fill="x", padx=20, pady=8)
@@ -433,5 +418,41 @@ entryLimiteTemp.bind("<KeyRelease>", actualizarLimite)
 lblMediaTiempoReal = ctk.CTkLabel(frameDer_temp, text="Temp. Media Actual: Esperando datos...", font=("Roboto", 14))
 lblMediaTiempoReal.pack(pady=5)
 
-window.after(100,RefreshGUI) #llama a la funcion que hace que el grafico y las alarmas tengan la nueva informacion
+#Marco superior de los botones
+frame_botones = ctk.CTkFrame(TabsMain.tab("Grafica DHT"))
+frame_botones.grid(row=1,column=0, columnspan=2, padx=20,pady=10,sticky="nsew")
+frame_botones.rowconfigure(0,weight=0)
+frame_botones.rowconfigure(1,weight=1)
+frame_botones.columnconfigure(0,weight=2)
+frame_botones.columnconfigure(1,weight=2)
+frame_botones.columnconfigure(2,weight=1)
+titulobotones = ctk.CTkLabel(frame_botones,text="Controles sensor DHT",font=("Roboto",15),anchor="w")
+titulobotones.grid(row=0,column=0,columnspan=3,sticky="ew",padx=15,pady=(8,0))
+
+#Botones Marco Superior
+IniBotonDHT = ctk.CTkButton(frame_botones,text="▶️",command=DHTStart, font=("Roboto",50),fg_color=ColoresConfigurables["colorDHTBoton"],text_color="black",)
+IniBotonDHT.grid(row=1,column=0,padx=5,pady=5,sticky="nsew")
+PararBotonDHT = ctk.CTkButton(frame_botones,text="⏸️",command=DHTStop, font=("Roboto",50),fg_color=ColoresConfigurables["colorDHTBoton"],text_color="black",)
+PararBotonDHT.grid(row=1,column=1,padx=5,pady=5,sticky="nsew")
+BotonConfiDHT = ctk.CTkButton(frame_botones,text="⚙️",command=DHTConfig, font=("Roboto",50),text_color="black",)
+BotonConfiDHT.grid(row=1,column=2,padx=5,pady=5,sticky="nsew")
+#Marco inferior de los botones
+frameInf_botones = ctk.CTkFrame(window)
+frameInf_botones.grid(row=3,column=0,padx=20,pady=10,sticky="nsew")
+frameInf_botones.rowconfigure(0,weight=0)
+frameInf_botones.columnconfigure(0,weight=1)
+frameInf_botones.columnconfigure(1,weight=1)
+
+#Botones marco inferior
+AbrirSerialBoton = ctk.CTkButton(frameInf_botones,text="Abrir Puerto serie",command=AbrirSerial, font=("Roboto",18))
+AbrirSerialBoton.grid(row=0,column=0,padx=5,pady=5,sticky="nsew")
+ColorPopUpBoton = ctk.CTkButton(frameInf_botones,text="Abrir config de colores",command=ColorPopUp, font=("Roboto",18))
+ColorPopUpBoton.grid(row=0,column=1,padx=5,pady=5,sticky="nsew")
+
+def on_closing():
+    CerrarSerial()
+    window.destroy()
+window.protocol("WM_DELETE_WINDOW", on_closing)
+
+window.after(25,RefreshGUI) #llama a la funcion que hace que el grafico y las alarmas tengan la nueva informacion
 window.mainloop()
