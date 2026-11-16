@@ -17,7 +17,7 @@ HCSR04Status = False
 ErrorSensorDHT = False
 ser = None
 serOpen = False
-serialPort = "/dev/ttyACM0"
+PORT = "/dev/ttyACM0"
 # Customización
 # Diccionario de colores customizables
 ColoresConfigurables = {
@@ -63,7 +63,7 @@ contadorMediasAltas = 0
 def AbrirSerial():
     global ser, serOpen
     try:
-        ser = serial.Serial(serialPort,baudrate=9600,timeout=1)
+        ser = serial.Serial(PORT,baudrate=9600,timeout=1)
         serOpen = True
     except:
         print("No se ha podido abrir el puerto serie")
@@ -74,6 +74,16 @@ def CerrarSerial():
     if serOpen:
         ser.close()
         serOpen = False
+
+def CambiarPuertoSerie():
+    global ser
+    Dialogo = ctk.CTkInputDialog(text="Introduzca el puerto serie",title="Cambio puerto serie")
+    try:
+        PORT = Dialogo.get_input()
+        ser.close()
+        ser = serial.Serial(PORT,baudrate=9600,timeout=1)
+    except:
+        print("Puerto incorrecto")
 
 #Grafica TH
 GrafDHT = Figure(figsize=(5,4),dpi=100)
@@ -413,9 +423,9 @@ window = ctk.CTk()
 window.title("ControlSat")
 window.geometry("1920x1080") # Tamaño de la ventana en pixeles
 window.grid_rowconfigure(0,weight=0)
-window.grid_rowconfigure(1,weight=0)
-window.grid_rowconfigure(2,weight=1)
-window.grid_rowconfigure(3,weight=0)
+window.grid_rowconfigure(1,weight=1)
+window.grid_rowconfigure(2,weight=4)
+window.grid_rowconfigure(3,weight=1)
 window.grid_columnconfigure(0,weight=1)
 
 # Configuración parte de Arriba
@@ -548,18 +558,22 @@ PararBotonHCSR04 = ctk.CTkButton(frame_botones2,text="⏸️",command=HCSR04Stop
 PararBotonHCSR04.grid(row=1,column=1,padx=5,pady=5,sticky="nsew")
 BotonConfiHCSR04 = ctk.CTkButton(frame_botones2,text="⚙️",command=DHTConfig, font=("Roboto",50),text_color="black",)
 BotonConfiHCSR04.grid(row=1,column=2,padx=5,pady=5,sticky="nsew")
+
 #Marco inferior de los botones
-frameInf_botones = ctk.CTkFrame(window)
-frameInf_botones.grid(row=3,column=0,padx=10,pady=10,sticky="nsew")
+frameInf_botones = ctk.CTkFrame(window,height=20)
+frameInf_botones.grid(row=3,column=0,padx=5,pady=5,sticky="nsew")
 frameInf_botones.rowconfigure(0,weight=1)
 frameInf_botones.columnconfigure(0,weight=1)
 frameInf_botones.columnconfigure(1,weight=1)
+frameInf_botones.columnconfigure(2,weight=0)
 
 #Botones marco inferior
 AbrirSerialBoton = ctk.CTkButton(frameInf_botones,text="Abrir Puerto serie",command=AbrirSerial, font=("Roboto",18))
-AbrirSerialBoton.grid(row=0,column=0,padx=5,pady=5,sticky="nsew")
-ColorPopUpBoton = ctk.CTkButton(frameInf_botones,text="CerrarSerial",command=CerrarSerial, font=("Roboto",18))
-ColorPopUpBoton.grid(row=0,column=1,padx=5,pady=5,sticky="nsew")
+AbrirSerialBoton.grid(row=0,column=0,padx=5,pady=1,sticky="nsew")
+CerrarSerialBoton = ctk.CTkButton(frameInf_botones,text="Cerrar Puerto serie",command=CerrarSerial, font=("Roboto",18))
+CerrarSerialBoton.grid(row=0,column=1,padx=5,pady=1,sticky="nsew")
+CambiarPuertoSerieBoton = ctk.CTkButton(frameInf_botones,text="⚙️",command=CambiarPuertoSerie, font=("Roboto",30))
+CambiarPuertoSerieBoton.grid(row=0,column=2,padx=5,pady=1,sticky="nsew")
 
 def on_closing():
     CerrarSerial()
