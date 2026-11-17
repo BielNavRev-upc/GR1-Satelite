@@ -30,17 +30,7 @@ ColoresConfigurables = {
     "colorUSOBoton": "#55E9E7",
     "colorRadar": "#56EC49"
 }
-# Diccionario con los titulos de los botones de cambio de color
-BotonesModularesColor = {
-    "graficaBordes":"Color de los bordes de la grafica",
-    "graficaFondo":"Color del fondo de la grafica",
-    "colorLTemp": "Color de la linea de temepratura",
-    "colorLHum": "Color de la linea de humedad",
-    "colorLMedia": "Color de la linea de media temp.",
-    "colorDHTBoton": "Color del boton DHT",
-    "colorUSOBoton": "Color del boton Ultrasonido",
-    "colorRadar": "Color del radar"
-}
+
 CustomColoresOriginal = ColoresConfigurables.copy() # Si no se usa el copy el python diria que simplemente son la misma direccion de memoria y no nos quedariamos con los colores originales
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
@@ -279,50 +269,76 @@ def RefreshGUI():
 
 # Creación de Botones de cambio de color modulares
 # Funcion modular que crea los botones
-def BotonModular(master,variableColor):
-    def FuncionBoton():
-        global ColoresConfigurables
-        DialogoColor = ctk.CTkInputDialog(text="Introduzca un color en formato hexadecimal XXXXXX",title="Color nuevo")
-        ColorNuevo = DialogoColor.get_input()
+class BotonColores(ctk.CTkButton):
+    def __init__(self, master,titulo,LlaveColor,CambioColorCallback,**kwargs): # El '**kwargs' son opciones adicionales del boton como el color, el tamaño etc, se usa para que quede limpio
+        '''El super va a el parent de la clase, el "ctk.CTkButon", y hace que haga su setup, es decir, como si haces x = ctk.CTkButon(master) normalmente(fuera de la clase)'''
+        super().__init__(master,text=titulo, **kwargs)
+
+        # Guarda el "DNI" del color (la llave) y el callback dentro del objeto
+        self.LlaveColor = LlaveColor
+        self.CambioColorCallback = CambioColorCallback
+        # Asigna a que funcion apunta el comando
+        self.configure(command=self._Click)
+
+    def _Click(self):
+        dialog = ctk.CTkInputDialog(text="Introduzca un color en hexadecimal 'XXXXXX'",title="Color Nuevo")
+        ColorNuevo = dialog.get_input()
         if not ColorNuevo:
             return
-        if ColorNuevo:    
+        elif len(ColorNuevo)==6:
             try:
-                int(ColorNuevo,16) # Comprueba que el color se pueda pasar a un entero de base 16, es decir, hexadecimal.
-                if len(ColorNuevo)==6:
-                    ColoresConfigurables[variableColor] = ColorNuevo
+                int(ColorNuevo,16)
+                self.CambioColorCallback(self.LlaveColor,ColorNuevo)
             except:
                 print("Color no valido")
 
-        if len(ColorNuevo)==6:
-            ColorNuevo = f"#{ColorNuevo}"
-            ColoresConfigurables[variableColor] = ColorNuevo
-    BotonColor = ctk.CTkButton(master,text=BotonesModularesColor[variableColor],command=FuncionBoton,font=("Roboto",14),width=250)
-    BotonColor.pack(fill='x',pady=5,padx=5)
 
-# Funcion que hace la ventana de confi de colores
+class ConfiColoresDialog(ctk.CTkToplevel): 
+    #Crear la clase ConfiColoresDialog, que hereda todo lo que "ctk.CTkToplevel" puede hacer (lo que se usa para hacer una ventana de popup)
+    def __init__(self, parent,opciones,CambioColorCallback,ResetCallback): # Setup de la clase
+        '''El super va a el parent de la clase, el "ctk.CTkToplevel", y hace que haga su setup, es decir, como si haces x = ctk.CTkToplevel(parent) normalmente(fuera de la clase)'''
+        super().__init__(parent) 
+        self.title("Selección de colores")
+        self.geometry("400x500")
+
+        # Hooks de la ventana
+        self.CambioColorCallback = CambioColorCallback
+        self.ResetCallback = ResetCallback
+        self.opciones = opciones # Lista de opciones
+
+        self._setupUi()
+
+    def _setupUi(self):
+        #Boton de reset arriba del todo
+        self.BotonReset = ctk.CTkButton(self, text="Reset de colores",command=self.ResetCallback,font=("Roboto",18),fg_color="#C0392B",hover_color="#962D22")
+        self.BotonReset.pack(pady=15,padx=20,fill='x')
+
+        # Marco con barra de scroll
+        self.MarcoScroll = ctk.CTkScrollableFrame(self)
+        self.MarcoScroll.pack(expand = True, fill="both",padx=20,pady=(0,20))
+
+        # Creación de botones de manera modular
+        for titulo, llave in self.opciones: # como options esta compuesta de tuples (parejas de 2 elementos), el bucle for le asigna titulo al primer elemento y llave al 2o
+            BotonColores(self.MarcoScroll,titulo=titulo,LlaveColor=llave,CambioColorCallback=self.CambioColorCallback,font=("Roboto",14),width=250).pack(pady=5,padx=10,fill='x')
+
+def CambiarColor(llave, Color):
+    global ColoresConfigurables
+    ColoresConfigurables[llave] = f"#{Color}"
+
+def ColorReset():
+    global ColoresConfigurables
+    ColoresConfigurables = CustomColoresOriginal.copy()
+
 def ColorPopUp():
-    ConfiColor = ctk.CTkToplevel(window)
-    ConfiColor.title("Selección de colores")
-    ConfiColor.geometry("500x400")
-    def ColorReset():
-        global ColoresConfigurables
-        ColoresConfigurables = CustomColoresOriginal.copy()
-        RefreshGUI()
-    #Boton del Reset
-    BotonReset = ctk.CTkButton(ConfiColor, text="Reset de colores",command=ColorReset,font=("Roboto",18),fg_color="#C0392B",hover_color="#962D22")
-    BotonReset.pack(pady=15,padx=20,fill='x')
-    #Frame Scrolleable con los botones
-    ConfiColorScroll = ctk.CTkScrollableFrame(ConfiColor)
-    ConfiColorScroll.pack(expand=True,fill="both",padx=20,pady=(0,20))
-    BotonModular(ConfiColorScroll,"graficaBordes")
-    BotonModular(ConfiColorScroll,"graficaFondo")
-    BotonModular(ConfiColorScroll,"colorLTemp")
-    BotonModular(ConfiColorScroll,"colorLHum")
-    BotonModular(ConfiColorScroll, "colorLMedia")
-    BotonModular(ConfiColorScroll,"colorDHTBoton")
-    BotonModular(ConfiColorScroll,"colorUSOBoton")
-
+    '''Sitio donde se define la estructura del menu de cambiar colores'''
+    opciones = [
+        ("Borde de la gráfica", "graficaBordes"),
+        ("Fondo de la gráfica", "graficaFondo"),
+        ("Color de la linea de temperatura","colorLTemp"),
+        ("Color de la linea de humedad","colorLHum"),
+        ("C")
+    ]
+    ConfiColoresDialog(window, opciones,CambiarColor,ColorReset)
 # Funciones botones principales
 def DHTStart():
     global DHTStatus
