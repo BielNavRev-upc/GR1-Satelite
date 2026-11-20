@@ -17,7 +17,7 @@ HCSR04Status = False
 ErrorSensorDHT = False
 ser = None
 serOpen = False
-PORT = "/dev/ttyACM0"
+PORT = "COM3"
 # Customización
 # Diccionario de colores customizables
 ColoresConfigurables = {
