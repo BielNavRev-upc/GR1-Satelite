@@ -4,7 +4,7 @@ Biel Navarro, Laia Almira, Nicolás Sobrino
 Sistema de satelite capaz de leer datos de sensores de temperatura, humedad y ultrasonidos (radar) y enviarlos a una estacion de tierra para representarlos en una GUI con python y con la misma GUI enviar comandos de vuelta al arduino satelite.
 ## Version 2
 Implementación de las alarmas dentro de la GUI, 
-[Video de la versión 2](https://youtu.be/ery4VtAT7kw) // Placeholder
+[Video de la versión 2](https://youtu.be/ery4VtAT7kw) 
 
 Disclaimer IA:
 
