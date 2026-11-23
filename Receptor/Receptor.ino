@@ -4,6 +4,7 @@ const unsigned long heartbeatLEDInterval = 1000;
 const unsigned long SendErrorTHInterval = 750;
 const unsigned long THErrorTimeout = 5000;
 const unsigned long intervalRadar = 30;
+const unsigned long intervalORB = 1000;
 const int heartbeatLED = 7;
 const int ErrorTHLED = 8;
 
@@ -16,6 +17,7 @@ unsigned long lastErrorTHRec = 0;
 unsigned long lastValidTH = 0;
 unsigned long lastErrorTH = 0;
 unsigned long lastRadar = 0;
+unsigned long LastOrbUpdate = 0;
 
 // Configura los pines digitales 10 y 11
 SoftwareSerial mySerial(10, 11); // RX, TX (azul, naranja)
@@ -101,6 +103,11 @@ void SatFeedControl(String ID,String satFeed,unsigned long Now){ //Controla los 
       Serial.print(ID);
       Serial.println(satFeed);//muestra los datos recibidos
       lastRadar = Now;
+   }
+   if(ID == "8:"){
+      Serial.print(ID);
+      Serial.println(satFeed);
+      lastOrbUpdate = Now;
    }
 }
 void ErrorTHCheck(unsigned long Now){
